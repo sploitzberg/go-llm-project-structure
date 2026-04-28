@@ -73,6 +73,8 @@ This project follows Hexagonal Architecture with these layers:
 - [`internal/README.md`](internal/README.md) — Layer responsibilities
 - [`docs/architecture/architecture.md`](docs/architecture/architecture.md) — Visual dependency graph
 - [`AGENTS.md`](AGENTS.md) — Instructions for AI coding assistants
+- [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
 
 ## Makefile Targets
 
