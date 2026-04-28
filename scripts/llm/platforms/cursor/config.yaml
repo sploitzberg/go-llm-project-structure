@@ -197,16 +197,16 @@ structure:
         "hooks": {
           "afterFileEdit": [
             {
-              "command": ".cursor/hooks/format.sh",
-              "description": "Auto-format Go files after edit"
+              "command": ".cursor/hooks/post-write.sh",
+              "description": "Auto-format and validate Go files after edit"
             }
           ]
         }
       }
 
-  - path: hooks/format.sh
+  - path: hooks/post-write.sh
     type: file
-    source: scripts/llm/hooks/format-go.sh
+    source: scripts/llm/hooks/post-write-go.sh
 
   # === Skills ===
   - path: skills/hexagonal-review/SKILL.md

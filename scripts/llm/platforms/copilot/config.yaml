@@ -4,8 +4,6 @@ folder: .github
 structure:
   - path: hooks/
     type: dir
-  - path: hooks/scripts/
-    type: dir
   - path: skills/
     type: dir
 

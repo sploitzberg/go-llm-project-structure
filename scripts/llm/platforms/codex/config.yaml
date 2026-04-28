@@ -384,7 +384,6 @@ structure:
         "hooks": {
           "PostToolUse": [
             {
-              "matcher": "Write|Edit",
               "command": ".codex/hooks/post-write.sh"
             }
           ]
