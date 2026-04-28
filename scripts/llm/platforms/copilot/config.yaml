@@ -26,32 +26,7 @@ structure:
 
   - path: hooks/scripts/post-write.sh
     type: file
-    content: |
-      #!/usr/bin/env bash
-      # Post-write hook for GitHub Copilot
-
-      ROOT="$(cd "$(dirname "$0")/../../../" && pwd)"
-      cd "$ROOT"
-
-      if [[ "$1" == *.go ]]; then
-        # Format Go files
-        gofmt -l -s -w "$1" 2>/dev/null || true
-        goimports -l -w "$1" 2>/dev/null || true
-
-        # Run fast quality checks
-        go vet ./... 2>/dev/null || true
-        ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
-        ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
-
-        # Run LLM-specific hooks
-        if [ -f "scripts/llm/hooks/post-write-test-suggestion.sh" ]; then
-          ./scripts/llm/hooks/post-write-test-suggestion.sh "$1" 2>/dev/null || true
-        fi
-
-        if [ -f "scripts/llm/hooks/post-write-doc-reminder.sh" ]; then
-          ./scripts/llm/hooks/post-write-doc-reminder.sh "$1" 2>/dev/null || true
-        fi
-      fi
+    source: scripts/llm/platforms/copilot/hooks/post-write.sh
 
   - path: agents/architect.md
     type: file
