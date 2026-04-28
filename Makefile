@@ -1,6 +1,6 @@
 # Makefile for LLM Folder Bootstrap CLI
 
-.PHONY: help build test integration lint fmt ci clean install run tidy vet update govulncheck \
+.PHONY: help build test test-all integration lint fmt ci clean install run tidy vet update govulncheck \
 	build-linux build-darwin build-windows build-all
 
 # Bare `make` runs the full CI pipeline (same as `make ci`). Use `make help` to list targets.
@@ -40,6 +40,13 @@ build-all: build-linux build-darwin build-windows
 
 test:
 	go test -race -count=1 ./...
+
+test-all:
+	@echo "Running unit tests..."
+	@go test -race -count=1 ./...
+	@echo ""
+	@echo "Running integration tests..."
+	@go test -race -count=1 -tags=integration ./...
 
 integration:
 	go test -count=1 -race -tags=integration ./...
@@ -95,6 +102,7 @@ help:
 	@echo "  make build-darwin    Cross-compile for darwin/amd64"
 	@echo "  make build-windows   Cross-compile for windows/amd64"
 	@echo "  make test            Run tests"
+	@echo "  make test-all        Run both unit and integration tests"
 	@echo "  make integration     Run integration tests (slower, external dependencies)"
 	@echo "  make lint            Run golangci-lint"
 	@echo "  make fmt             Format code"

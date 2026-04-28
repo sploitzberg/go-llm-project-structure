@@ -102,7 +102,7 @@ This project separates unit and integration tests to maintain fast CI feedback.
   - Use mocks for external dependencies
   - No build tag required
 
-- **Integration tests** — Run weekly or manually (`make integration`)
+- **Integration tests** — Run on every push (`make integration`)
   - Test with real external dependencies (databases, APIs)
   - Add `//go:build integration` tag at top of file
   - Use for end-to-end validation
