@@ -332,8 +332,8 @@ structure:
 
   - path: hooks/pre-read.sh
     type: file
-    source: scripts/llm/platforms/windsurf/hooks/pre-read.sh
+    source: scripts/llm/hooks/pre-read-go.sh
 
   - path: hooks/post-write.sh
     type: file
-    source: scripts/llm/platforms/windsurf/hooks/post-write.sh
+    source: scripts/llm/hooks/post-write-go.sh

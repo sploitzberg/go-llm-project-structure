@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Format hook for Cursor
+# Generic format hook for Go files
+# Used by Cursor and similar platforms
 
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT"
 
 gofmt -l -s -w "$1" 2>/dev/null || true

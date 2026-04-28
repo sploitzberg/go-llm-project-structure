@@ -206,7 +206,7 @@ structure:
 
   - path: hooks/format.sh
     type: file
-    source: scripts/llm/platforms/cursor/hooks/format.sh
+    source: scripts/llm/hooks/format-go.sh
 
   # === Skills ===
   - path: skills/hexagonal-review/SKILL.md

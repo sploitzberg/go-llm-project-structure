@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Pre-read hook - runs before Windsurf reads code
+# Generic pre-read hook for Go files
+# Used by Windsurf and similar platforms
 
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT"
 
 # Run context injection

@@ -393,4 +393,4 @@ structure:
 
   - path: hooks/post-write.sh
     type: file
-    source: scripts/llm/platforms/codex/hooks/post-write.sh
+    source: scripts/llm/hooks/post-write-go.sh

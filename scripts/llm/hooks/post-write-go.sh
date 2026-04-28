@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Post-write hook for Claude
+# Generic post-write hook for Go files
+# Used by all LLM platforms
 
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT"
 
 file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")

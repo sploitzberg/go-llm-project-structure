@@ -26,7 +26,7 @@ structure:
 
   - path: hooks/scripts/post-write.sh
     type: file
-    source: scripts/llm/platforms/copilot/hooks/post-write.sh
+    source: scripts/llm/hooks/post-write-go.sh
 
   - path: agents/architect.md
     type: file
