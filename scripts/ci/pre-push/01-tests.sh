@@ -13,8 +13,7 @@ if ! command -v go >/dev/null 2>&1; then
     echo -e "${RED}error:${NC} go not found"
     exit 1
 fi
--e ${CYAN}> ${NC}
-echo "Running full test suite..."
+echo -e "${CYAN}> Running full test suite${NC}"
 
 go test ./...
 echo -e "${GREEN}Tests: OK${NC}"
