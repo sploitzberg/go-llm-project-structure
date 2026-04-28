@@ -67,6 +67,7 @@ yq -o=json '.structure' "$CONFIG_FILE" | jq -c '.[]' | while read -r item; do
     path=$(echo "$item" | jq -r '.path')
     type=$(echo "$item" | jq -r '.type')
     content=$(echo "$item" | jq -r '.content // ""')
+    source=$(echo "$item" | jq -r '.source // ""')
 
     fullpath="$TARGET_DIR/$path"
 
@@ -75,16 +76,31 @@ yq -o=json '.structure' "$CONFIG_FILE" | jq -c '.[]' | while read -r item; do
         echo "✓ Created directory: $path"
     elif [ "$type" = "file" ]; then
         mkdir -p "$(dirname "$fullpath")"
-        if [ -n "$content" ]; then
+
+        # Handle source field (copy from source file)
+        if [ -n "$source" ]; then
+            source_path="$PROJECT_ROOT/$source"
+            if [ -f "$source_path" ]; then
+                cp "$source_path" "$fullpath"
+                echo "✓ Copied file: $path (from $source)"
+            else
+                echo "⚠️  Source file not found: $source_path (skipped)"
+                touch "$fullpath"
+            fi
+        # Handle content field (inline content)
+        elif [ -n "$content" ]; then
             echo "$content" > "$fullpath"
+            echo "✓ Created file: $path"
+        # No content or source, create empty file
         else
             touch "$fullpath"
+            echo "✓ Created empty file: $path"
         fi
+
         # Set executable permission for shell scripts
         if [[ "$path" == *.sh ]]; then
             chmod +x "$fullpath"
         fi
-        echo "✓ Created file: $path"
     else
         echo "⚠️  Unknown type '$type' for path '$path' (skipped)"
     fi
