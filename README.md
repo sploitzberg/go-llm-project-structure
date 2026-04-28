@@ -16,7 +16,7 @@ make llm-setup
 # Sensible defaults are applied automatically
 ```
 
-That's it! Your LLM coding assistant now has architecture rules, agents, and hooks configured to enforce Hexagonal Architecture.
+That's it! Your LLM coding assistant now has comprehensive Go-specific rules, skills, agents, and hooks configured to enforce clean, production-ready, robust Go code following Hexagonal Architecture.
 
 ## Guardrails & CI/CD
 
