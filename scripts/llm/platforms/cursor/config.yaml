@@ -23,8 +23,8 @@ structure:
 
       # Core Hexagonal Architecture Rules (Always Apply)
 
-      - `internal/domain/` must have **zero** internal imports
-      - `service/` may only depend on `domain/` and `port/`
+      - `internal/core/domain/` must have **zero** internal imports
+      - `core/services/` may only depend on `core/domain/` and `core/ports/`
       - Never import from `adapter/` in core layers
       - All infrastructure belongs in `adapter/`
 
@@ -220,8 +220,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Check that `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Check that `core/services/` only uses ports
       - Ensure adapters properly implement secondary ports
 
   - path: skills/hexagonal-review/SKILL.md
@@ -235,8 +235,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Ensure `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
       - Confirm adapters properly implement secondary ports
 
   - path: skills/security-review/SKILL.md

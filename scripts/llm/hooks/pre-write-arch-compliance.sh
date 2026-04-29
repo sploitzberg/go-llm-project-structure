@@ -20,11 +20,11 @@ fi
 
 # Determine which layer the file is in
 layer=""
-if [[ "$file_path" == internal/domain/* ]]; then
+if [[ "$file_path" == internal/core/domain/* ]]; then
     layer="domain"
-elif [[ "$file_path" == internal/port/* ]]; then
+elif [[ "$file_path" == internal/core/ports/* ]]; then
     layer="port"
-elif [[ "$file_path" == internal/service/* ]]; then
+elif [[ "$file_path" == internal/core/services/* ]]; then
     layer="service"
 elif [[ "$file_path" == internal/adapter/* ]]; then
     layer="adapter"
@@ -55,13 +55,13 @@ case "$layer" in
         fi
         ;;
     port)
-        # Port must not import adapter or service
+        # Port must not import adapter or services
         if echo "$content" | grep -q 'internal/adapter'; then
             echo -e "${RED}VIOLATION${NC}: Port layer must not import adapter/"
             violations=$((violations + 1))
         fi
-        if echo "$content" | grep -q 'internal/service'; then
-            echo -e "${RED}VIOLATION${NC}: Port layer must not import service/"
+        if echo "$content" | grep -q 'internal/core/services'; then
+            echo -e "${RED}VIOLATION${NC}: Port layer must not import services/"
             violations=$((violations + 1))
         fi
         ;;

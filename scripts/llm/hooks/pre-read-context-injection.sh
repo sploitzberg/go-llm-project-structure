@@ -15,11 +15,11 @@ fi
 
 # Determine which layer the file is in
 layer=""
-if [[ "$file_path" == internal/domain/* ]]; then
+if [[ "$file_path" == internal/core/domain/* ]]; then
     layer="domain"
-elif [[ "$file_path" == internal/port/* ]]; then
+elif [[ "$file_path" == internal/core/ports/* ]]; then
     layer="port"
-elif [[ "$file_path" == internal/service/* ]]; then
+elif [[ "$file_path" == internal/core/services/* ]]; then
     layer="service"
 elif [[ "$file_path" == internal/adapter/* ]]; then
     layer="adapter"
@@ -42,35 +42,35 @@ case "$layer" in
         echo "- Must have ZERO internal imports (only standard library)"
         echo "- Pure business entities and value objects"
         echo "- No framework dependencies"
-        echo "- No dependencies on port/, service/, or adapter/"
+        echo "- No dependencies on core/ports/, core/services/, or adapter/"
         echo ""
-        echo "Related Documentation: internal/domain/README.md"
+        echo "Related Documentation: internal/core/domain/README.md"
         ;;
     port)
         echo "PORT LAYER RULES:"
         echo "- Defines interfaces (contracts)"
-        echo "- Can only depend on domain/"
-        echo "- Must NOT depend on adapter/ or service/"
+        echo "- Can only depend on core/domain/"
+        echo "- Must NOT depend on adapter/ or core/services/"
         echo "- Primary ports: inbound use cases"
         echo "- Secondary ports: outbound dependencies"
         echo ""
-        echo "Related Documentation: internal/port/README.md"
+        echo "Related Documentation: internal/core/ports/README.md"
         ;;
     service)
         echo "SERVICE LAYER RULES:"
         echo "- Implements application use cases"
-        echo "- Can only depend on domain/ and port/"
+        echo "- Can only depend on core/domain/ and core/ports/"
         echo "- Must NOT depend on adapter/"
         echo "- Orchestrates domain logic"
         echo ""
-        echo "Related Documentation: internal/service/README.md"
+        echo "Related Documentation: internal/core/services/README.md"
         ;;
     adapter)
         echo "ADAPTER LAYER RULES:"
         echo "- Concrete implementations of ports"
         echo "- Primary adapters: HTTP, gRPC, CLI (call primary ports)"
         echo "- Secondary adapters: Database, APIs (implement secondary ports)"
-        echo "- Can depend on port/ and domain/"
+        echo "- Can depend on core/ports/ and core/domain/"
         echo ""
         echo "Related Documentation: internal/adapter/README.md"
         ;;
@@ -92,17 +92,17 @@ case "$layer" in
         ;;
     port)
         echo "- Standard library"
-        echo "- internal/domain/"
+        echo "- internal/core/domain/"
         ;;
     service)
         echo "- Standard library"
-        echo "- internal/domain/"
-        echo "- internal/port/"
+        echo "- internal/core/domain/"
+        echo "- internal/core/ports/"
         ;;
     adapter)
         echo "- Standard library"
-        echo "- internal/domain/"
-        echo "- internal/port/"
+        echo "- internal/core/domain/"
+        echo "- internal/core/ports/"
         ;;
     config)
         echo "- Standard library"

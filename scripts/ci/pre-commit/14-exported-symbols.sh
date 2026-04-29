@@ -12,7 +12,7 @@ NC='\033[0m'
 
 echo -e "${CYAN}> Running exported symbol validation${NC}"
 
-if [ ! -d "internal/domain" ]; then
+if [ ! -d "internal/core/domain" ]; then
     echo -e "${YELLOW}warning:${NC} No domain directory found, skipping"
     exit 0
 fi
@@ -21,7 +21,7 @@ errors=0
 warnings=0
 
 # Find all exported types in domain
-domain_files=$(find internal/domain -name "*.go" 2>/dev/null || true)
+domain_files=$(find internal/core/domain -name "*.go" 2>/dev/null || true)
 
 for file in $domain_files; do
     # Find exported types
@@ -58,8 +58,8 @@ for file in $domain_files; do
 done
 
 # Check that domain doesn't export implementation patterns
-if grep -r "internal.*adapter\|internal.*service" internal/domain 2>/dev/null | grep -q .; then
-    echo -e "${RED}error:${NC} Domain has references to adapter or service packages"
+if grep -r "internal.*adapter\|internal.*core/services" internal/core/domain 2>/dev/null | grep -q .; then
+    echo -e "${RED}error:${NC} Domain has references to adapter or services packages"
     ((errors++))
 fi
 

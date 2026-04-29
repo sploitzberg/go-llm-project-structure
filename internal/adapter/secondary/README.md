@@ -12,4 +12,4 @@ These are the infrastructure components the application uses.
 - File system access
 - Email / notification senders
 
-They implement the interfaces defined in `port/secondary`.
+They implement the interfaces defined in `core/ports/secondary`.

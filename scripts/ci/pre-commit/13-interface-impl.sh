@@ -45,7 +45,7 @@ for file in $adapter_files; do
 done
 
 # Check that port interfaces are actually implemented by adapters
-port_interfaces=$(find internal/port -name "*.go" -exec grep -l "^type.*interface" {} \; 2>/dev/null || true)
+port_interfaces=$(find internal/core/ports -name "*.go" -exec grep -l "^type.*interface" {} \; 2>/dev/null || true)
 
 for port_file in $port_interfaces; do
     port_pkg=$(dirname "$port_file" | xargs basename)

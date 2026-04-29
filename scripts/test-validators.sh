@@ -17,10 +17,10 @@ echo
 
 # Test 1: Domain with adapter import (should fail hex-arch-guardrail)
 echo "Test 1: Domain with forbidden adapter import"
-if [ ! -d "internal/domain" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No internal/domain directory"
+if [ ! -d "internal/core/domain" ]; then
+    echo -e "${YELLOW}SKIP${NC}: No internal/core/domain directory"
 else
-    TEST_FILE="internal/domain/test_violation.go"
+    TEST_FILE="internal/core/domain/test_violation.go"
     cat > "$TEST_FILE" <<'EOF'
 package domain
 
@@ -30,7 +30,7 @@ type TestEntity struct{}
 EOF
 
     # Run hex-arch-guardrail and check if it catches the violation
-    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "domain/ must not import"; then
+    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "core/domain/ must not import"; then
         echo -e "${GREEN}PASS${NC}: Domain with forbidden adapter import detected"
     else
         echo -e "${RED}FAIL${NC}: Domain with forbidden adapter import not detected"
@@ -40,10 +40,10 @@ fi
 
 # Test 2: Service with adapter import (should fail hex-arch-guardrail)
 echo "Test 2: Service with forbidden adapter import"
-if [ ! -d "internal/service" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No internal/service directory"
+if [ ! -d "internal/core/services" ]; then
+    echo -e "${YELLOW}SKIP${NC}: No internal/core/services directory"
 else
-    TEST_FILE="internal/service/test_violation.go"
+    TEST_FILE="internal/core/services/test_violation.go"
     cat > "$TEST_FILE" <<'EOF'
 package service
 
@@ -52,7 +52,7 @@ import "github.com/sploitzberg/go-llm-project-structure/internal/adapter"
 type TestService struct{}
 EOF
 
-    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "service/ must not depend on adapter"; then
+    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "core/services/ must not depend on adapter"; then
         echo -e "${GREEN}PASS${NC}: Service with forbidden adapter import detected"
     else
         echo -e "${RED}FAIL${NC}: Service with forbidden adapter import not detected"

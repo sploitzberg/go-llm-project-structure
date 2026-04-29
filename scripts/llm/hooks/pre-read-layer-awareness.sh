@@ -18,13 +18,13 @@ fi
 
 # Determine which layer the file is in
 layer=""
-if [[ "$file_path" == internal/domain/* ]]; then
+if [[ "$file_path" == internal/core/domain/* ]]; then
     layer="domain"
-elif [[ "$file_path" == internal/port/primary/* ]]; then
+elif [[ "$file_path" == internal/core/ports/primary/* ]]; then
     layer="port-primary"
-elif [[ "$file_path" == internal/port/secondary/* ]]; then
+elif [[ "$file_path" == internal/core/ports/secondary/* ]]; then
     layer="port-secondary"
-elif [[ "$file_path" == internal/service/* ]]; then
+elif [[ "$file_path" == internal/core/services/* ]]; then
     layer="service"
 elif [[ "$file_path" == internal/adapter/primary/* ]]; then
     layer="adapter-primary"

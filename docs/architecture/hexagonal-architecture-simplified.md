@@ -94,7 +94,7 @@ graph TB
 **What it does:** Defines what "User", "Order", "Product" mean and what rules they follow.
 
 ```go
-// internal/domain/user.go
+// internal/core/domain/user.go
 type User struct {
     ID       UserID
     Email    string
@@ -128,7 +128,7 @@ Ports are just empty contracts - they say "something needs to provide this capab
 **Example:**
 
 ```go
-// internal/port/primary/user_service.go
+// internal/core/ports/primary/user_service.go
 type UserService interface {
     // A user wants to sign up
     Register(ctx context.Context, cmd RegisterUserCommand) (User, error)
@@ -152,7 +152,7 @@ type UserService interface {
 **Example:**
 
 ```go
-// internal/port/secondary/user_repository.go
+// internal/core/ports/secondary/user_repository.go
 type UserRepository interface {
     // I need to save a user somewhere
     Save(ctx context.Context, user *User) error
@@ -182,7 +182,7 @@ The app doesn't care who provides these - could be PostgreSQL, MongoDB, or even 
 **What it does:** Takes requests from primary ports, uses domain entities, and calls secondary ports to get things done.
 
 ```go
-// internal/service/user_service.go
+// internal/core/services/user_service.go
 type UserServiceImpl struct {
     userRepo UserRepository  // Secondary port - I need this to save users
     emailSender EmailSender // Secondary port - I need this to send emails
@@ -221,7 +221,7 @@ func (s *UserServiceImpl) Register(ctx context.Context, cmd RegisterUserCommand)
 
 **Important rules:**
 
-- Can depend on `domain/` and `port/`
+- Can depend on `core/domain/` and `core/ports/`
 - Cannot depend on `adapter/` (that would be cheating!)
 - Uses ports, not concrete implementations
 

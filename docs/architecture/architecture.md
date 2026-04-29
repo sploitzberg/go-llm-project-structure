@@ -13,22 +13,22 @@ The goal is to create a clean, maintainable, and technology-independent core tha
 
 ## Layer Responsibilities
 
-### `domain/`
+### `core/domain/`
 
 - Contains business entities, value objects, and domain rules.
 - Completely independent — no imports from any other internal package.
 - Represents the business language and invariants of the system.
 
-### `port/`
+### `core/ports/`
 
 - Defines **interfaces** (contracts) between the core and the outside world.
-- `port/primary/` — Driving ports (inbound): what the outside world can ask the application to do (use cases).
-- `port/secondary/` — Driven ports (outbound): what the application needs from external systems.
+- `core/ports/primary/` — Driving ports (inbound): what the outside world can ask the application to do (use cases).
+- `core/ports/secondary/` — Driven ports (outbound): what the application needs from external systems.
 
-### `service/`
+### `core/services/`
 
 - Implements application use cases and orchestrates domain logic.
-- Depends only on `domain/` and `port/`.
+- Depends only on `core/domain/` and `core/ports/`.
 - Contains workflow logic, transaction management, and coordination.
 
 ### `adapter/`
@@ -49,9 +49,9 @@ The goal is to create a clean, maintainable, and technology-independent core tha
 flowchart TB
     subgraph Core["Application Core"]
         direction TB
-        Domain[domain/]
-        Port[port/]
-        Service[service/]
+        Domain[core/domain/]
+        Port[core/ports/]
+        Service[core/services/]
     end
 
     subgraph Adapters["Infrastructure Adapters"]

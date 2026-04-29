@@ -62,15 +62,16 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 
 This project follows Hexagonal Architecture with these layers:
 
-- `internal/domain/` — Pure business entities and rules (zero dependencies)
-- `internal/port/` — Interface definitions (primary/secondary)
-- `internal/service/` — Application use case orchestration
+- `internal/core/domain/` — Pure business entities and rules (zero dependencies)
+- `internal/core/ports/` — Interface definitions (primary/secondary)
+- `internal/core/services/` — Application use case orchestration
 - `internal/adapter/` — Concrete implementations (HTTP, database, etc.)
 - `internal/config/` — Configuration structures
 
 ## Documentation
 
 - [`internal/README.md`](internal/README.md) — Layer responsibilities
+- [`internal/core/README.md`](internal/core/README.md) — Core architecture overview
 - [`docs/architecture/architecture.md`](docs/architecture/architecture.md) — Visual dependency graph
 - [`AGENTS.md`](AGENTS.md) — Instructions for AI coding assistants
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting

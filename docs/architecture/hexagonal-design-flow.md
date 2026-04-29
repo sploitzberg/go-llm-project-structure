@@ -36,7 +36,7 @@ This ensures your core business logic drives the design, not technical choices l
 ### Output
 
 ```go
-// internal/domain/user.go
+// internal/core/domain/user.go
 package domain
 
 import "errors"
@@ -72,7 +72,7 @@ func (u *User) Activate() error {
 
 ### Domain Methods vs Service Methods
 
-**Entity methods (business rules) are defined on entities in `domain/`:**
+**Entity methods (business rules) are defined on entities in `core/domain/`:**
 
 - `user.go` contains the `User` entity struct
 - Methods like `User.Activate()` are business rules about what the entity CAN do
@@ -80,7 +80,7 @@ func (u *User) Activate() error {
 - Self-contained, no external dependencies
 - Examples: `User.Activate()`, `User.ValidatePassword()`, `User.IsEmailValid()`
 
-**Service methods (use cases) are defined in `service/`:**
+**Service methods (use cases) are defined in `core/services/`:**
 
 - `user_service.go` contains use case implementations
 - Methods like `Register()` coordinate what the system DOES
@@ -122,13 +122,13 @@ func (u *User) Activate() error {
 ### Output
 
 ```go
-// internal/port/primary/user_service.go
+// internal/core/ports/primary/user_service.go
 package port
 
 import (
     "context"
 
-    "github.com/myapp/internal/domain"
+    "github.com/myapp/internal/core/domain"
 )
 
 // UserService is an interface (port) defining what the outside world can ask the service layer to do
@@ -183,13 +183,13 @@ type RegisterUserCommand struct {
 ### Output
 
 ```go
-// internal/port/secondary/user_repository.go
+// internal/core/ports/secondary/user_repository.go
 package port
 
 import (
     "context"
 
-    "github.com/myapp/internal/domain"
+    "github.com/myapp/internal/core/domain"
 )
 
 // UserRepository defines what the application needs for data persistence
@@ -199,13 +199,13 @@ type UserRepository interface {
     ExistsByEmail(ctx context.Context, email domain.Email) (bool, error)
 }
 
-// internal/port/secondary/email_sender.go
+// internal/core/ports/secondary/email_sender.go
 package port
 
 import (
     "context"
 
-    "github.com/myapp/internal/domain"
+    "github.com/myapp/internal/core/domain"
 )
 
 // EmailSender defines what the application needs for sending emails
@@ -247,15 +247,15 @@ type EmailSender interface {
 ### Output
 
 ```go
-// internal/service/user_service.go
+// internal/core/services/user_service.go
 package service
 
 import (
     "context"
     "errors"
 
-    "github.com/myapp/internal/domain"
-    "github.com/myapp/internal/port"
+    "github.com/myapp/internal/core/domain"
+    "github.com/myapp/internal/core/ports"
 )
 
 // UserServiceImpl implements the UserService port interface
@@ -335,8 +335,8 @@ import (
     "encoding/json"
     "net/http"
 
-    "github.com/myapp/internal/domain"
-    "github.com/myapp/internal/port"
+    "github.com/myapp/internal/core/domain"
+    "github.com/myapp/internal/core/ports"
 )
 
 type HTTPUserHandler struct {
@@ -376,8 +376,8 @@ import (
     "context"
     "database/sql"
 
-    "github.com/myapp/internal/domain"
-    "github.com/myapp/internal/port"
+    "github.com/myapp/internal/core/domain"
+    "github.com/myapp/internal/core/ports"
 )
 
 type PostgresUserRepository struct {
@@ -430,7 +430,7 @@ var _ port.UserRepository = (*PostgresUserRepository)(nil)
 ### Step 1: Domain (entity with business rule methods)
 
 ```go
-// internal/domain/user.go
+// internal/core/domain/user.go
 type User struct {
     ID    UserID
     Email Email
@@ -446,7 +446,7 @@ func (u *User) Activate() error { ... }
 ### Step 2: Primary Port (interface, not implementation)
 
 ```go
-// internal/port/primary/user_service.go
+// internal/core/ports/primary/user_service.go
 type UserService interface {
     Register(ctx context.Context, cmd RegisterUserCommand) (User, error)
 }
@@ -455,13 +455,13 @@ type UserService interface {
 ### Step 3: Secondary Ports (interfaces for external dependencies)
 
 ```go
-// internal/port/secondary/user_repository.go
+// internal/core/ports/secondary/user_repository.go
 type UserRepository interface {
     Save(ctx context.Context, user *User) error
     ExistsByEmail(ctx context.Context, email string) (bool, error)
 }
 
-// internal/port/secondary/email_sender.go
+// internal/core/ports/secondary/email_sender.go
 type EmailSender interface {
     SendWelcomeEmail(ctx context.Context, to Email) error
 }
@@ -470,7 +470,7 @@ type EmailSender interface {
 ### Step 4: Service (implements primary port, coordinates use case)
 
 ```go
-// internal/service/user_service.go
+// internal/core/services/user_service.go
 type UserServiceImpl struct {
     userRepo    UserRepository  // Secondary port interface
     emailSender EmailSender      // Secondary port interface

@@ -136,8 +136,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Ensure `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
       - Confirm adapters properly implement secondary ports
 
   - path: skills/security-review/SKILL.md

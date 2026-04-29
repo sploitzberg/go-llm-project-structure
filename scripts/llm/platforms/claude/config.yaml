@@ -21,9 +21,9 @@ structure:
 
       ## Core Principles (Always Follow)
 
-      - `domain/` must be completely pure (no internal imports)
-      - Dependencies must flow **inward** toward `domain/`
-      - `service/` depends only on `domain/` and `port/`
+      - `core/domain/` must be completely pure (no internal imports)
+      - Dependencies must flow **inward** toward `core/domain/`
+      - `core/services/` depends only on `core/domain/` and `core/ports/`
       - `adapter/` implements ports only
       - Follow `.golangci.yml` (depguard + gosec)
 
@@ -39,8 +39,8 @@ structure:
     content: |
       # Core Hexagonal Architecture Rules
 
-      - `internal/domain/` must have zero internal imports
-      - `service/` may only depend on `domain/` and `port/`
+      - `internal/core/domain/` must have zero internal imports
+      - `core/services/` may only depend on `core/domain/` and `core/ports/`
       - Never import from `adapter/` in core layers
       - All infrastructure belongs in `adapter/`
 
@@ -177,8 +177,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Ensure `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
       - Confirm adapters properly implement secondary ports
 
   - path: skills/hexagonal-review/SKILL.md
@@ -192,8 +192,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Ensure `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
       - Confirm adapters properly implement secondary ports
 
   - path: skills/security-review/SKILL.md

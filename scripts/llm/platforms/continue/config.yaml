@@ -138,8 +138,8 @@ structure:
       # Architecture Check
 
       Verify that code changes follow Hexagonal Architecture:
-      - domain/ must be pure (no internal imports)
-      - service/ depends only on domain/ and port/
+      - core/domain/ must be pure (no internal imports)
+      - core/services/ depends only on core/domain/ and core/ports/
       - adapter/ implements ports only
       - No framework packages in core layers
 
@@ -170,8 +170,8 @@ structure:
       # Hexagonal Architecture Review Skill
 
       When reviewing changes:
-      - Verify `domain/` purity
-      - Ensure `service/` only uses ports
+      - Verify `core/domain/` purity
+      - Ensure `core/services/` only uses ports
       - Confirm adapters properly implement secondary ports
 
   - path: skills/security-review/SKILL.md

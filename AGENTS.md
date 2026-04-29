@@ -23,15 +23,15 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 
 ### Layer Responsibilities & Rules
 
-- **`domain/`** — Pure business entities, value objects, and domain rules.
+- **`core/domain/`** — Pure business entities, value objects, and domain rules.
   **Must have zero dependencies** on any other internal package.
 
-- **`port/`** — Defines clean interfaces (contracts).
-  - `port/primary/` → Driving ports (inbound use cases)
-  - `port/secondary/` → Driven ports (outbound contracts)
+- **`core/ports/`** — Defines clean interfaces (contracts).
+  - `core/ports/primary/` → Driving ports (inbound use cases)
+  - `core/ports/secondary/` → Driven ports (outbound contracts)
 
-- **`service/`** — Application services that implement use cases.
-  Depends **only** on `domain/` and `port/`.
+- **`core/services/`** — Application services that implement use cases.
+  Depends **only** on `core/domain/` and `core/ports/`.
 
 - **`adapter/`** — Concrete implementations of ports.
   - `adapter/primary/` → Inbound (HTTP, CLI, gRPC, etc.)
@@ -41,9 +41,9 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 
 ### Strict Rules
 
-- Never import `adapter/` from `domain/`, `port/`, or `service/`
-- Never import `service/` from `domain/` or `port/`
-- `domain/` must remain pure at all times
+- Never import `adapter/` from `core/domain/`, `core/ports/`, or `core/services/`
+- Never import `core/services/` from `core/domain/` or `core/ports/`
+- `core/domain/` must remain pure at all times
 - All external interactions must go through ports
 - Follow `.golangci.yml` (especially `depguard` rules)
 
@@ -52,7 +52,8 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 ### Full Documentation
 
 - Detailed layer explanations → [`internal/README.md`](internal/README.md)
-- Visual dependency graph + deeper explanation → [`docs/architecture.md`](docs/architecture.md)
+- Core architecture overview → [`internal/core/README.md`](internal/core/README.md)
+- Visual dependency graph + deeper explanation → [`docs/architecture/architecture.md`](docs/architecture/architecture.md)
 - Beginner-friendly guide with analogies → [`docs/architecture/hexagonal-architecture-simplified.md`](docs/architecture/hexagonal-architecture-simplified.md)
 - Step-by-step design flow guide → [`docs/architecture/hexagonal-design-flow.md`](docs/architecture/hexagonal-design-flow.md)
 
@@ -78,7 +79,7 @@ This project follows **four authoritative Go style and best practice guides**. A
 - **Interfaces**: Keep small and focused, named after behavior.
 - **Testing**: Table-driven with `t.Run`, maintain 80%+ coverage.
 - **Concurrency**: Use `context.Context` as first parameter when appropriate.
-- **Architecture**: Maintain strict hexagonal boundaries, keep `domain/` pure.
+- **Architecture**: Maintain strict hexagonal boundaries, keep `core/domain/` pure.
 
 **Precedence**: Effective Go → Google Style Guide → Style Decisions → Best Practices
 

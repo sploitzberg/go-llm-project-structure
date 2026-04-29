@@ -11,13 +11,13 @@ NC='\033[0m'
 
 echo -e "${CYAN}> Running struct field validation${NC}"
 
-if [ ! -d "internal/domain" ]; then
+if [ ! -d "internal/core/domain" ]; then
     echo -e "${GREEN}No domain directory found, skipping${NC}"
     exit 0
 fi
 
 # Find all Go files in domain
-domain_files=$(find internal/domain -name "*.go" 2>/dev/null || true)
+domain_files=$(find internal/core/domain -name "*.go" 2>/dev/null || true)
 
 errors=0
 
@@ -35,9 +35,9 @@ for file in $domain_files; do
 
         # Check for field types that might be external dependencies
         # Look for types from other internal packages
-        if echo "$struct_body" | grep -E "internal/(adapter|service|port)" | grep -q .; then
-            echo -e "${RED}error:${NC} $file:$line_num Struct $struct_name has fields from adapter/service/port packages"
-            echo "$struct_body" | grep -E "internal/(adapter|service|port)"
+        if echo "$struct_body" | grep -E "internal/(adapter|core/services|core/ports)" | grep -q .; then
+            echo -e "${RED}error:${NC} $file:$line_num Struct $struct_name has fields from adapter/services/ports packages"
+            echo "$struct_body" | grep -E "internal/(adapter|core/services|core/ports)"
             ((errors++))
         fi
 
@@ -51,7 +51,7 @@ for file in $domain_files; do
 done
 
 # Also check service and port for framework leaks
-for dir in internal/service internal/port; do
+for dir in internal/core/services internal/core/ports; do
     if [ ! -d "$dir" ]; then
         continue
     fi
@@ -65,7 +65,7 @@ for dir in internal/service internal/port; do
             line_num=$(echo "$line" | cut -d: -f1)
             struct_body=$(sed -n "${line_num},/^}/p" "$file" || true)
 
-            # Check for framework types in service/port
+            # Check for framework types in services/ports
             if echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql)" | grep -q .; then
                 echo -e "${RED}error:${NC} $file:$line_num Struct in $dir has framework types (forbidden)"
                 echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql)"
