@@ -4,14 +4,9 @@ You are working on a **production-grade Go codebase** that follows strict Hexago
 
 ## Your Responsibilities as an Agent
 
-- **Strictly adhere** to all architectural rules, coding standards, and best practices defined in this repository.
-- **Never cut corners** — even when making small changes or working under time pressure.
-- Always prioritize **clean, robust, maintainable, and production-ready** code.
-- Focus on **long-term code quality**, readability, and architectural integrity.
-- If a solution feels messy, unclear, or "just works for now", refactor it properly.
-- Security, testability, and strict separation of concerns are non-negotiable.
-
-**Default to excellence.** Every change should improve the codebase or at least maintain its high standards.
+- Strictly adhere to architectural rules, coding standards, and best practices. Never cut corners.
+- Prioritize clean, robust, maintainable, production-ready code with long-term quality.
+- Refactor messy or unclear solutions properly. Security, testability, and separation of concerns are non-negotiable.
 
 ---
 
@@ -58,6 +53,8 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 
 - Detailed layer explanations → [`internal/README.md`](internal/README.md)
 - Visual dependency graph + deeper explanation → [`docs/architecture.md`](docs/architecture.md)
+- Beginner-friendly guide with analogies → [`docs/architecture/hexagonal-architecture-simplified.md`](docs/architecture/hexagonal-architecture-simplified.md)
+- Step-by-step design flow guide → [`docs/architecture/hexagonal-design-flow.md`](docs/architecture/hexagonal-design-flow.md)
 
 ---
 
@@ -67,27 +64,23 @@ This project follows **four authoritative Go style and best practice guides**. A
 
 ### Authoritative References
 
-1. **[Effective Go](https://go.dev/doc/effective_go)** — Official idiomatic Go guidance from the language team.
-2. **[Google Go Style Guide](https://google.github.io/styleguide/go/guide)** — General style, naming, and formatting.
-3. **[Google Go Style Decisions](https://google.github.io/styleguide/go/decisions)** — Specific practical decisions.
-4. **[Google Go Best Practices](https://google.github.io/styleguide/go/best-practices)** — High-level guidance on design and maintainability.
+1. [Effective Go](https://go.dev/doc/effective_go)
+2. [Google Go Style Guide](https://google.github.io/styleguide/go/guide)
+3. [Google Go Style Decisions](https://google.github.io/styleguide/go/decisions)
+4. [Google Go Best Practices](https://google.github.io/styleguide/go/best-practices)
 
 ### Summary of Core Expectations
 
-- **Clarity First**: Code must be obvious to the reader at a glance. Prioritize readability over cleverness.
-- **Simplicity**: Choose the simplest solution that works. "Less is more" — avoid unnecessary abstraction.
-- **Consistency**: Follow `gofmt`, `goimports`, and the style of the surrounding codebase.
-- **Naming**: Use `MixedCaps` for exported names and `mixedCaps` for unexported. Be concise but descriptive.
-- **Comments**: Every exported identifier must have a complete sentence comment starting with its name.
-- **Error Handling**: Always check errors. Wrap them with `%w`. Use `errors.Is` and `errors.As` appropriately.
-- **Interfaces**: Keep them small and focused. Name them after behavior.
-- **Testing**: Prefer table-driven tests. Use clear names and `t.Run` for subtests.
-- **Concurrency**: Always use `context.Context` as the first parameter when appropriate.
-- **Architecture**: Maintain strict hexagonal boundaries — keep `domain/` pure and dependencies flowing inward.
+- **Clarity & Simplicity**: Prioritize readability over cleverness. Choose the simplest solution.
+- **Consistency**: Follow `gofmt`, `goimports`, and surrounding codebase style.
+- **Naming & Comments**: `MixedCaps` for exported, `mixedCaps` for unexported. Exported identifiers need sentence comments.
+- **Error Handling**: Always check errors, wrap with `%w`, use `errors.Is`/`errors.As`.
+- **Interfaces**: Keep small and focused, named after behavior.
+- **Testing**: Table-driven with `t.Run`, maintain 80%+ coverage.
+- **Concurrency**: Use `context.Context` as first parameter when appropriate.
+- **Architecture**: Maintain strict hexagonal boundaries, keep `domain/` pure.
 
-**When in doubt**, consult the references above in this order of precedence:
-
-**Effective Go → Google Style Guide → Style Decisions → Best Practices**
+**Precedence**: Effective Go → Google Style Guide → Style Decisions → Best Practices
 
 ---
 
@@ -97,15 +90,8 @@ This project separates unit and integration tests to maintain fast CI feedback.
 
 ### Test Types
 
-- **Unit tests** — Run on every commit/PR (`make test`)
-  - Test business logic in isolation
-  - Use mocks for external dependencies
-  - No build tag required
-
-- **Integration tests** — Run on every push (`make integration`)
-  - Test with real external dependencies (databases, APIs)
-  - Add `//go:build integration` tag at top of file
-  - Use for end-to-end validation
+- **Unit tests** — Run on commit/PR (`make test`). Test logic in isolation with mocks.
+- **Integration tests** — Run on push (`make integration`). Add `//go:build integration` tag. Test with real dependencies.
 
 ### Test Guidelines
 
@@ -118,66 +104,18 @@ This project separates unit and integration tests to maintain fast CI feedback.
 ### Running Tests
 
 ```bash
-# Run unit tests
-make test
-# or
+make test                    # Unit tests
 go test -race -count=1 ./...
-
-# Run integration tests
-make integration
-# or
+make integration             # Integration tests
 go test -race -tags=integration ./...
-
-# Run tests with coverage
-go test -coverprofile=coverage.out ./...
-```
-
-### Example Integration Test
-
-```go
-//go:build integration
-
-package mypackage
-
-import "testing"
-
-func TestMyIntegration(t *testing.T) {
-    // Test with real external dependencies
-}
+go test -coverprofile=coverage.out ./...  # With coverage
 ```
 
 ---
 
 ## Go Conventions Validation
 
-This project includes a dedicated script to validate adherence to modern Go conventions from Effective Go and Google Style Guide.
-
-### Convention Checks
-
-The `scripts/ci/pre-commit/18-go-conventions.sh` script validates:
-
-- No `context.Background()` in exported functions (should accept `context.Context`)
-- No TODO/FIXME/HACK comments in production code
-- No `panic()` in production code (except in init or tests)
-- No empty `struct{}` for channels (use `struct{}{}`)
-- No `time.Sleep()` in production code (use proper timing/timeout)
-- No bare returns in complex functions
-- No exported errors without `Error()` method
-- No `string()` conversion on errors (use `.Error()` or type assertion)
-- No `os.Exit()` in non-main packages
-- No `log.Fatal()` in production code
-- No main packages outside `cmd/`
-- No `init()` functions in production code (use proper initialization)
-
-### Running Convention Checks
-
-```bash
-# Run via git hook (automatic on commit)
-git commit
-
-# Run standalone
-./scripts/ci/pre-commit/18-go-conventions.sh
-```
+The `scripts/ci/pre-commit/18-go-conventions.sh` script validates adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See the script for the full list of checks.
 
 ---
 
@@ -204,16 +142,6 @@ Git hooks run automatically on commits/push. All hook logic lives in `scripts/ci
 - **pre-rebase**: protect main/master branches
 - **prepare-commit-msg**: add branch name to commit message
 
-### CI Script Structure
-
-All check logic is centralized in `scripts/ci/` organized by hook type:
-
-- `scripts/ci/pre-commit/` — Pre-commit checks
-- `scripts/ci/pre-push/` — Pre-push checks
-- `scripts/ci/commit-msg/` — Commit message validation
-- `scripts/ci/pre-rebase/` — Pre-rebase checks
-- `scripts/ci/prepare-commit-msg/` — Prepare-commit-msg hooks
-
 ### Configuration
 
 Environment variables control behavior:
@@ -226,24 +154,4 @@ Environment variables control behavior:
 
 ## Leveraging Go Package Documentation
 
-One of the most powerful resources available to you is the official Go package documentation at [pkg.go.dev](https://pkg.go.dev).
-
-### How to Use It
-
-For any Go package, you can instantly access its full documentation by visiting: https://pkg.go.dev/ + the import path
-
-### Examples
-
-- Standard library: https://pkg.go.dev/net/http
-- Third-party package: https://pkg.go.dev/github.com/gin-gonic/gin
-
-### Why This Is Valuable
-
-- Always up-to-date documentation with examples, function signatures, and source code.
-- Excellent search and cross-referencing.
-- Shows godoc comments, usage examples, and related packages.
-- Helps you understand how to use a package correctly and idiomatically.
-
-### Best Practice
-
-When working with any unfamiliar package (standard library or external), first visit its pkg.go.dev page to understand its API before writing code. This significantly improves accuracy and adherence to Go idioms.
+Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
