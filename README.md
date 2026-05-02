@@ -68,6 +68,38 @@ This project follows Hexagonal Architecture with these layers:
 - `internal/adapter/` — Concrete implementations (HTTP, database, etc.)
 - `internal/config/` — Configuration structures
 
+## Mosaic Integration
+
+This project includes **Mosaic (HexxlaDB)** integration for AI-assisted long-term memory and context retrieval. Mosaic is an external workflow tool that enhances LLM coding assistants with:
+
+- **Semantic Search** - Discover related code, decisions, and patterns using embeddings
+- **Structured Queries** - Find information by tags, time, or spatial proximity
+- **Context Expansion** - Load neighboring context from the hex lattice for comprehensive understanding
+- **Knowledge Persistence** - Automatically capture user/assistant exchanges for future reference
+
+### Retention Policy
+
+The project uses `save_all_turns` retention policy:
+
+- Every user_message and assistant_response is automatically persisted
+- No user permission required - compliance is automatic
+- Enforced through Mosaic MCP server configuration
+
+### Mosaic Documentation
+
+- [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for AI agents
+- [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in development
+- [`docs/mosaic_retention_compliance.md`](docs/mosaic_retention_compliance.md) — Retention policy compliance
+
+### LLM Platform Integration
+
+Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claude, Continue, Copilot, Codex) with:
+
+- Platform-specific hooks for context injection
+- Mosaic MCP tool guidance
+- Intelligent read/write patterns
+- Tag reuse conventions
+
 ## Documentation
 
 - [`internal/README.md`](internal/README.md) — Layer responsibilities

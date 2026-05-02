@@ -52,7 +52,7 @@ for file in $go_files; do
 
             # Warn about potential missing %w
             echo -e "${YELLOW}warning:${NC} $file:$line_num Function $func_name returns error but may not wrap with %w"
-            ((warnings++))
+            warnings=$((warnings + 1))
         fi
     done <<< "$error_funcs"
 done

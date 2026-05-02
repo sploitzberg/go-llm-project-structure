@@ -4,6 +4,8 @@ You are working on a **production-grade Go codebase** that follows strict Hexago
 
 ## Your Responsibilities as an Agent
 
+- **Mosaic Retention Policy:** Follow the configured retention policy (see `docs/mosaic/AGENT_QUICK_REFERENCE.md` for details). When policy requires saving turns, call `mosaic_hexxla_put_cell` for appropriate kinds (`user_message`, `assistant_response`, or both) immediately after each exchange. Include relevant topic-specific tags when calling put_cell. Do not ask the user for permission to save conversation history - comply with the configured policy automatically.
+- **ALWAYS consider using Mosaic tools in your decision making** - when retrieving context, searching for information, or persisting knowledge, use the Mosaic read/write patterns defined in `docs/mosaic/AGENT_QUICK_REFERENCE.md`.
 - Strictly adhere to architectural rules, coding standards, and best practices. Never cut corners.
 - Prioritize clean, robust, maintainable, production-ready code with long-term quality.
 - Refactor messy or unclear solutions properly. Security, testability, and separation of concerns are non-negotiable.
@@ -56,6 +58,23 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 - Visual dependency graph + deeper explanation → [`docs/architecture/architecture.md`](docs/architecture/architecture.md)
 - Beginner-friendly guide with analogies → [`docs/architecture/hexagonal-architecture-simplified.md`](docs/architecture/hexagonal-architecture-simplified.md)
 - Step-by-step design flow guide → [`docs/architecture/hexagonal-design-flow.md`](docs/architecture/hexagonal-design-flow.md)
+
+---
+
+## Mosaic Documentation
+
+This project uses Mosaic (HexxlaDB) as an external workflow tool for AI agents. Mosaic is NOT part of the project architecture - it's a separate tool used in the development workflow for long-term memory and context retrieval. Comprehensive documentation is available in `docs/mosaic/`:
+
+- [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for AI agents working with Mosaic
+- [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in the development workflow
+- [`docs/mosaic_retention_compliance.md`](docs/mosaic_retention_compliance.md) — Retention policy compliance documentation
+
+### Retention Policy
+
+- **capture_mode**: `save_all_turns`
+- **enforcement**: `true` — server returns error for conflicting put_cell kinds
+- **Requirement**: Persist every user_message and assistant_response automatically
+- **Critical**: Never ask user for permission — comply automatically
 
 ---
 

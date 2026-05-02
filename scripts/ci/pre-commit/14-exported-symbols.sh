@@ -36,7 +36,7 @@ for file in $domain_files; do
 
             if [ -n "$exported_fields" ]; then
                 echo -e "${YELLOW}warning:${NC} Domain struct $type in $file has exported fields: $exported_fields"
-                ((warnings++))
+                warnings=$((warnings + 1))
             fi
         fi
     done
