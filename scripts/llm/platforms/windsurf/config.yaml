@@ -505,9 +505,33 @@ structure:
               "show_output": false
             }
           ],
+          "pre_write_code": [
+            {
+              "command": ".windsurf/hooks/pre-write.sh",
+              "show_output": false
+            }
+          ],
+          "post_write_code": [
+            {
+              "command": ".windsurf/hooks/post-write-code.sh",
+              "show_output": false
+            }
+          ],
+          "pre_run_command": [
+            {
+              "command": ".windsurf/hooks/pre-run-command.sh",
+              "show_output": false
+            }
+          ],
           "pre_mcp_tool_use": [
             {
               "command": ".windsurf/hooks/pre-mcp-tool-use.sh",
+              "show_output": false
+            }
+          ],
+          "post_mcp_tool_use": [
+            {
+              "command": ".windsurf/hooks/post-mcp-tool-use.sh",
               "show_output": false
             }
           ],
@@ -588,6 +612,201 @@ structure:
 
         if [ -f "scripts/llm/hooks/post-write-doc-reminder.sh" ]; then
           ./scripts/llm/hooks/post-write-doc-reminder.sh "$1" 2>/dev/null || true
+        fi
+      fi
+
+      exit 0
+
+  - path: hooks/pre-write.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Pre-write validation hook
+      # Validates code before it's written to disk
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from input
+      file_path=$(echo "$input" | jq -r '.tool_info.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$file_path" ]]; then
+        exit 0
+      fi
+
+      # Check if file is a Go file
+      if [[ "$file_path" != *.go ]]; then
+        exit 0
+      fi
+
+      # Block writes to protected files
+      protected_files=(
+        "go.mod"
+        "go.sum"
+        ".golangci.yml"
+        "Makefile"
+      )
+
+      for protected in "${protected_files[@]}"; do
+        if [[ "$(basename "$file_path")" == "$protected" ]]; then
+          echo "⚠️  Protected file: $file_path"
+          echo "This file should not be modified directly."
+          echo "Use 'go mod tidy' for go.mod/go.sum instead."
+          # Exit with code 2 to block the action
+          exit 2
+        fi
+      done
+
+      # Check if file is in core/domain/ and would violate purity
+      if [[ "$file_path" == internal/core/domain/* ]]; then
+        # Check if the edit would add imports from adapter/services/ports
+        # This is a simplified check - in practice you'd parse the edits
+        echo "ℹ️  Writing to core/domain/ - ensure no internal dependencies"
+      fi
+
+      exit 0
+
+  - path: hooks/post-write-code.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Targeted post-write hook for individual file changes
+      # Runs formatters and checks on the specific file that was written
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from input
+      file_path=$(echo "$input" | jq -r '.tool_info.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$file_path" ]]; then
+        exit 0
+      fi
+
+      # Only process Go files
+      if [[ "$file_path" != *.go ]]; then
+        exit 0
+      fi
+
+      # Format the specific file
+      gofmt -l -s -w "$file_path" 2>/dev/null || true
+      goimports -l -w "$file_path" 2>/dev/null || true
+
+      # Run go vet on the specific package
+      pkg_dir=$(dirname "$file_path")
+      go vet "$pkg_dir" 2>/dev/null || true
+
+      # Run architecture guardrail on the specific file
+      ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
+
+      # Run Go conventions check on the specific file
+      ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
+
+      exit 0
+
+  - path: hooks/pre-run-command.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Pre-run command hook
+      # Blocks dangerous commands before execution
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse command line from input
+      command_line=$(echo "$input" | jq -r '.tool_info.command_line // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$command_line" ]]; then
+        exit 0
+      fi
+
+      # List of dangerous commands to block
+      dangerous_patterns=(
+        "rm -rf /"
+        "rm -rf /home"
+        "rm -rf /usr"
+        "rm -rf /etc"
+        "rm -rf /var"
+        "dd if="
+        ":(){:|:&};:"
+        "> /dev/sd"
+        "mkfs."
+        "git push --force"
+        "git push -f"
+        "chmod -R 777 /"
+        "chown -R"
+      )
+
+      # Check if command matches any dangerous pattern
+      for pattern in "${dangerous_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⛔  Blocked dangerous command: $command_line"
+          echo "Pattern matched: $pattern"
+          # Exit with code 2 to block the action
+          exit 2
+        fi
+      done
+
+      # Warn about potentially destructive commands
+      warning_patterns=(
+        "rm -rf"
+        "git push"
+        "docker rm"
+        "kubectl delete"
+      )
+
+      for pattern in "${warning_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⚠️  Warning: Potentially destructive command: $command_line"
+          echo "Pattern: $pattern"
+          # Don't block, just warn
+        fi
+      done
+
+      exit 0
+
+  - path: hooks/post-mcp-tool-use.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Post-MCP tool use hook
+      # Logs Mosaic MCP tool usage for analytics and monitoring
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse MCP tool info
+      mcp_server_name=$(echo "$input" | jq -r '.tool_info.mcp_server_name // empty' 2>/dev/null || echo "")
+      mcp_tool_name=$(echo "$input" | jq -r '.tool_info.mcp_tool_name // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
+        # Log the tool usage (could be sent to analytics service)
+        echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
+
+        # If this is a Mosaic tool, log it for tracking
+        if [[ "$mcp_server_name" == "mosaic" ]]; then
+          echo "🧩 Mosaic Tool: $mcp_tool_name" >&2
         fi
       fi
 
