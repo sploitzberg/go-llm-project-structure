@@ -18,6 +18,15 @@ linters:
     - revive
     - whitespace
     - copyloopvar
+    - exhaustruct
+    - forcetypeassert
+    - musttag
+    - nilerr
+    - noctx
+    - prealloc
+    - unconvert
+    - gocyclo
+    - dupl
 
   settings:
     depguard:

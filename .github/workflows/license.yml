@@ -1,0 +1,32 @@
+name: License Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  license:
+    name: Check Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+
+      - name: Check licenses
+        run: |
+          go-licenses check ./... \
+            --disallowed_types=forbidden,restricted,unknown \
+            --allowed_licenses=MIT,Apache-2.0,BSD-3-Clause,BSD-2-Clause,ISC
