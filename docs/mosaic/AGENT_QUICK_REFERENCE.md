@@ -4,26 +4,36 @@ This document provides a quick reference for AI agents working with Mosaic in th
 
 ## Retention Policy (CRITICAL)
 
-**Configuration:**
+**Check Current Policy:**
 
-- `capture_mode`: `save_all_turns`
-- `enforcement`: `true` — server returns error for conflicting put_cell kinds
+Before persisting any conversation turns, call `mosaic_hexxla_get_persistence_policy` to determine the current retention configuration.
+
+**Common Policies:**
+
+- `save_all_turns` — Save both user_message and assistant_response for every exchange
+- `save_user_only` — Save only user_message turns
+- `save_assistant_only` — Save only assistant_response turns
+- `save_none` — No automatic persistence required
+- Custom policies — May have specific requirements
 
 **MUST DO:**
 
-- Call `mosaic_hexxla_put_cell` for BOTH `user_message` and `assistant_response` after EVERY exchange
-- NEVER ask user for permission — comply automatically
-- Use same `source_id` for both messages in the same exchange
+- Check the current policy at session start using `mosaic_hexxla_get_persistence_policy`
+- Follow the policy's `capture_mode` to determine which turn kinds to persist
+- If `enforcement: true`, server returns error for conflicting put_cell kinds
+- NEVER ask user for permission — comply with configured policy automatically
+- Use same `source_id` for both messages in the same exchange (if saving both)
 - Include relevant topic-specific tags
 
-**Pattern:**
+**Pattern (for save_all_turns policy):**
 
 ```text
 1. Receive user message
-2. mosaic_hexxla_put_cell(kind=user_message, source_id=session_id, tags=[...], ...)
-3. Generate response
-4. mosaic_hexxla_put_cell(kind=assistant_response, source_id=session_id, tags=[...], ...)
-5. Display response
+2. mosaic_hexxla_get_persistence_policy() — check capture_mode
+3. mosaic_hexxla_put_cell(kind=user_message, source_id=session_id, tags=[...], ...)
+4. Generate response
+5. mosaic_hexxla_put_cell(kind=assistant_response, source_id=session_id, tags=[...], ...)
+6. Display response
 ```
 
 ## Intelligent Read Patterns
