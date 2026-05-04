@@ -514,7 +514,7 @@ structure:
           "pre_write_code": [
             {
               "command": ".windsurf/hooks/pre-write.sh",
-              "show_output": false
+              "show_output": true
             }
           ],
           "post_write_code": [
@@ -526,7 +526,7 @@ structure:
           "pre_run_command": [
             {
               "command": ".windsurf/hooks/pre-run-command.sh",
-              "show_output": false
+              "show_output": true
             }
           ],
           "post_run_command": [
