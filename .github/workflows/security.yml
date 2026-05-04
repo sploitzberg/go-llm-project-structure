@@ -46,11 +46,8 @@ jobs:
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
 
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: "trivy-results.sarif"
+      # Note: SARIF upload disabled - requires code scanning to be enabled in repository settings
+      # To enable: Repository Settings > Security and analysis > Code scanning"
 
   gosec:
     name: Gosec Security Scan
@@ -70,8 +67,5 @@ jobs:
         with:
           args: "-no-fail -fmt sarif -out gosec-results.sarif ./..."
 
-      - name: Upload Gosec results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: "gosec-results.sarif"
+      # Note: SARIF upload disabled - requires code scanning to be enabled in repository settings
+      # To enable: Repository Settings > Security and analysis > Code scanning
