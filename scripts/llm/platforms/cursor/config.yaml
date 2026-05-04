@@ -614,10 +614,34 @@ structure:
               "description": "Inject architecture and mosaic context before reading files"
             }
           ],
-          "beforeSubmitPrompt": [
+          "afterReadFile": [
             {
-              "command": ".cursor/hooks/pre-submit-prompt.sh",
-              "description": "Inject mosaic context before agent reasoning"
+              "command": ".cursor/hooks/post-read-code.sh",
+              "description": "Track file access patterns"
+            }
+          ],
+          "beforeFileEdit": [
+            {
+              "command": ".cursor/hooks/pre-write.sh",
+              "description": "Validate before file writes, block protected files"
+            }
+          ],
+          "afterFileEdit": [
+            {
+              "command": ".cursor/hooks/post-write-code.sh",
+              "description": "Auto-format and validate Go files after edit"
+            }
+          ],
+          "beforeCommandExecution": [
+            {
+              "command": ".cursor/hooks/pre-run-command.sh",
+              "description": "Block dangerous commands"
+            }
+          ],
+          "afterCommandExecution": [
+            {
+              "command": ".cursor/hooks/post-run-command.sh",
+              "description": "Log command execution"
             }
           ],
           "beforeMCPExecution": [
@@ -626,10 +650,16 @@ structure:
               "description": "Provide mosaic MCP tool guidance"
             }
           ],
-          "afterFileEdit": [
+          "afterMCPExecution": [
             {
-              "command": ".cursor/hooks/post-write.sh",
-              "description": "Auto-format and validate Go files after edit"
+              "command": ".cursor/hooks/post-mcp-execution.sh",
+              "description": "Track Mosaic operations"
+            }
+          ],
+          "beforeSubmitPrompt": [
+            {
+              "command": ".cursor/hooks/pre-submit-prompt.sh",
+              "description": "Inject mosaic context before agent reasoning"
             }
           ],
           "sessionStart": [
@@ -641,11 +671,48 @@ structure:
         }
       }
 
+  - path: hooks/post-write-code.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor post-write-code hook for Go files
+      # Targeted post-write actions for individual files
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from cursor input
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ "$file_path" == *.go ]]; then
+        # Format Go files
+        gofmt -l -s -w "$file_path" 2>/dev/null || true
+        goimports -l -w "$file_path" 2>/dev/null || true
+
+        # Run go vet on the specific package
+        pkg_dir=$(dirname "$file_path")
+        go vet "$pkg_dir" 2>/dev/null || true
+
+        # Run architecture guardrail on the specific file
+        ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
+
+        # Run Go conventions check on the specific file
+        ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
+      fi
+
+      # Return success
+      echo '{"continue": true, "permission": "allow"}'
+
+      exit 0
+
   - path: hooks/post-write.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor post-write hook for Go files
+      # Cursor post-write hook for Go files (legacy, kept for compatibility)
       # Receives JSON input via stdin
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -680,6 +747,185 @@ structure:
       # Return success
       echo '{"continue": true, "permission": "allow"}'
 
+      exit 0
+
+  - path: hooks/post-read-code.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor post-read-code hook
+      # Tracks file access patterns
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from cursor input
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$file_path" ]]; then
+        echo "📖 File read: $file_path" >&2
+
+        # Track which layers are being accessed
+        if [[ "$file_path" == internal/core/domain/* ]]; then
+          echo "  Layer: core/domain" >&2
+        elif [[ "$file_path" == internal/core/ports/* ]]; then
+          echo "  Layer: core/ports" >&2
+        elif [[ "$file_path" == internal/core/services/* ]]; then
+          echo "  Layer: core/services" >&2
+        elif [[ "$file_path" == internal/adapter/primary/* ]]; then
+          echo "  Layer: adapter/primary" >&2
+        elif [[ "$file_path" == internal/adapter/secondary/* ]]; then
+          echo "  Layer: adapter/secondary" >&2
+        fi
+      fi
+
+      echo '{"continue": true, "permission": "allow"}'
+      exit 0
+
+  - path: hooks/pre-write.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor pre-write hook
+      # Validates code before it's written to disk
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from cursor input
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$file_path" ]]; then
+        echo '{"continue": true, "permission": "allow"}'
+        exit 0
+      fi
+
+      # Check if file is a Go file
+      if [[ "$file_path" != *.go ]]; then
+        echo '{"continue": true, "permission": "allow"}'
+        exit 0
+      fi
+
+      # Block writes to protected files
+      protected_files=("go.mod" "go.sum" ".golangci.yml" "Makefile")
+
+      for protected in "${protected_files[@]}"; do
+        if [[ "$(basename "$file_path")" == "$protected" ]]; then
+          echo "⚠️  Protected file: $file_path" >&2
+          echo "This file should not be modified directly." >&2
+          echo '{"continue": false, "permission": "deny", "reason": "Protected file"}'
+          exit 0
+        fi
+      done
+
+      # Check if file is in core/domain/ and would violate purity
+      if [[ "$file_path" == internal/core/domain/* ]]; then
+        echo "ℹ️  Writing to core/domain/ - ensure no internal dependencies" >&2
+      fi
+
+      echo '{"continue": true, "permission": "allow"}'
+      exit 0
+
+  - path: hooks/pre-run-command.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor pre-run-command hook
+      # Blocks dangerous commands before execution
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse command line from cursor input
+      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$command_line" ]]; then
+        echo '{"continue": true, "permission": "allow"}'
+        exit 0
+      fi
+
+      # List of dangerous commands to block
+      dangerous_patterns=("rm -rf /" "rm -rf /home" "rm -rf /usr" "rm -rf /etc" "rm -rf /var" "dd if=" ":(){:|:&};:" "> /dev/sd" "mkfs." "git push --force" "git push -f" "chmod -R 777 /" "chown -R")
+
+      # Check if command matches any dangerous pattern
+      for pattern in "${dangerous_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⛔  Blocked dangerous command: $command_line" >&2
+          echo '{"continue": false, "permission": "deny", "reason": "Dangerous command"}'
+          exit 0
+        fi
+      done
+
+      # Warn about potentially destructive commands
+      warning_patterns=("rm -rf" "git push" "docker rm" "kubectl delete")
+
+      for pattern in "${warning_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⚠️  Warning: Potentially destructive command: $command_line" >&2
+        fi
+      done
+
+      echo '{"continue": true, "permission": "allow"}'
+      exit 0
+
+  - path: hooks/post-run-command.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor post-run-command hook
+      # Logs command execution results
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse command line from cursor input
+      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$command_line" ]]; then
+        echo "🚀 Command executed: $command_line" >&2
+      fi
+
+      echo '{"continue": true, "permission": "allow"}'
+      exit 0
+
+  - path: hooks/post-mcp-execution.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor post-mcp-execution hook
+      # Logs Mosaic MCP tool usage
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse MCP tool info
+      mcp_server_name=$(echo "$input" | jq -r '.server_name // empty' 2>/dev/null || echo "")
+      mcp_tool_name=$(echo "$input" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
+        echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
+
+        if [[ "$mcp_server_name" == "mosaic" ]]; then
+          echo "🧩 Mosaic Tool: $mcp_tool_name" >&2
+        fi
+      fi
+
+      echo '{"continue": true, "permission": "allow"}'
       exit 0
 
   - path: hooks/pre-read.sh

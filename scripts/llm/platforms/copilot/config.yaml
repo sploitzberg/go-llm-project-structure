@@ -401,6 +401,54 @@ structure:
       {
         "version": 1,
         "hooks": {
+          "pre-read": [
+            {
+              "command": ".github/hooks/scripts/pre-read.sh",
+              "description": "Inject architecture and mosaic context before reading files"
+            }
+          ],
+          "post-read": [
+            {
+              "command": ".github/hooks/scripts/post-read-code.sh",
+              "description": "Track file access patterns"
+            }
+          ],
+          "pre-write": [
+            {
+              "command": ".github/hooks/scripts/pre-write.sh",
+              "description": "Validate before file writes, block protected files"
+            }
+          ],
+          "post-write": [
+            {
+              "command": ".github/hooks/scripts/post-write-code.sh",
+              "description": "Auto-format and validate Go files after edit"
+            }
+          ],
+          "pre-command": [
+            {
+              "command": ".github/hooks/scripts/pre-run-command.sh",
+              "description": "Block dangerous commands"
+            }
+          ],
+          "post-command": [
+            {
+              "command": ".github/hooks/scripts/post-run-command.sh",
+              "description": "Log command execution"
+            }
+          ],
+          "pre-mcp": [
+            {
+              "command": ".github/hooks/scripts/pre-mcp-tool-use.sh",
+              "description": "Provide mosaic MCP tool guidance"
+            }
+          ],
+          "post-mcp": [
+            {
+              "command": ".github/hooks/scripts/post-mcp-tool-use.sh",
+              "description": "Track Mosaic operations"
+            }
+          ],
           "post-tool-use": [
             {
               "command": ".github/hooks/scripts/post-write.sh",
@@ -413,6 +461,188 @@ structure:
   - path: hooks/scripts/post-write.sh
     type: file
     source: scripts/llm/hooks/post-write-go.sh
+
+  - path: hooks/scripts/post-write-code.sh
+    type: file
+    source: scripts/llm/hooks/post-write-go.sh
+
+  - path: hooks/scripts/pre-read.sh
+    type: file
+    source: scripts/llm/hooks/pre-read-context-injection.sh
+
+  - path: hooks/scripts/post-read-code.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot post-read-code hook
+      # Tracks file access patterns
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$file_path" ]]; then
+        echo "📖 File read: $file_path" >&2
+        if [[ "$file_path" == internal/core/domain/* ]]; then
+          echo "  Layer: core/domain" >&2
+        elif [[ "$file_path" == internal/core/ports/* ]]; then
+          echo "  Layer: core/ports" >&2
+        elif [[ "$file_path" == internal/core/services/* ]]; then
+          echo "  Layer: core/services" >&2
+        elif [[ "$file_path" == internal/adapter/primary/* ]]; then
+          echo "  Layer: adapter/primary" >&2
+        elif [[ "$file_path" == internal/adapter/secondary/* ]]; then
+          echo "  Layer: adapter/secondary" >&2
+        fi
+      fi
+
+      exit 0
+
+  - path: hooks/scripts/pre-write.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot pre-write hook
+      # Validates code before it's written to disk
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$file_path" ]]; then
+        exit 0
+      fi
+
+      if [[ "$file_path" != *.go ]]; then
+        exit 0
+      fi
+
+      protected_files=("go.mod" "go.sum" ".golangci.yml" "Makefile")
+
+      for protected in "${protected_files[@]}"; do
+        if [[ "$(basename "$file_path")" == "$protected" ]]; then
+          echo "⚠️  Protected file: $file_path" >&2
+          echo "This file should not be modified directly." >&2
+          exit 2
+        fi
+      done
+
+      if [[ "$file_path" == internal/core/domain/* ]]; then
+        echo "ℹ️  Writing to core/domain/ - ensure no internal dependencies" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/scripts/pre-run-command.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot pre-run-command hook
+      # Blocks dangerous commands before execution
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$command_line" ]]; then
+        exit 0
+      fi
+
+      dangerous_patterns=("rm -rf /" "rm -rf /home" "rm -rf /usr" "rm -rf /etc" "rm -rf /var" "dd if=" ":(){:|:&};:" "> /dev/sd" "mkfs." "git push --force" "git push -f" "chmod -R 777 /" "chown -R")
+
+      for pattern in "${dangerous_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⛔  Blocked dangerous command: $command_line" >&2
+          exit 2
+        fi
+      done
+
+      warning_patterns=("rm -rf" "git push" "docker rm" "kubectl delete")
+
+      for pattern in "${warning_patterns[@]}"; do
+        if [[ "$command_line" == *"$pattern"* ]]; then
+          echo "⚠️  Warning: Potentially destructive command: $command_line" >&2
+        fi
+      done
+
+      exit 0
+
+  - path: hooks/scripts/post-run-command.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot post-run-command hook
+      # Logs command execution results
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$command_line" ]]; then
+        echo "🚀 Command executed: $command_line" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/scripts/pre-mcp-tool-use.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot pre-mcp-tool-use hook
+      # Provides Mosaic MCP tool guidance
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      mcp_server_name=$(echo "$input" | jq -r '.server_name // empty' 2>/dev/null || echo "")
+
+      if [[ "$mcp_server_name" == "mosaic" ]]; then
+        echo "🧩 Mosaic MCP tool guidance: Use intelligent read/write patterns" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/scripts/post-mcp-tool-use.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Copilot post-mcp-tool-use hook
+      # Logs Mosaic MCP tool usage
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+      cd "$ROOT"
+
+      input=$(cat)
+      mcp_server_name=$(echo "$input" | jq -r '.server_name // empty' 2>/dev/null || echo "")
+      mcp_tool_name=$(echo "$input" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
+        echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
+        if [[ "$mcp_server_name" == "mosaic" ]]; then
+          echo "🧩 Mosaic Tool: $mcp_tool_name" >&2
+        fi
+      fi
+
+      exit 0
 
   - path: agents/architect.md
     type: file
