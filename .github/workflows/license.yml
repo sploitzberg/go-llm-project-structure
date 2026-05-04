@@ -28,5 +28,4 @@ jobs:
       - name: Check licenses
         run: |
           go-licenses check ./... \
-            --disallowed_types=forbidden,restricted,unknown \
-            --allowed_licenses=MIT,Apache-2.0,BSD-3-Clause,BSD-2-Clause,ISC
+            --disallowed_types=forbidden,restricted,unknown

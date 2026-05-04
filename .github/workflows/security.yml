@@ -2,7 +2,7 @@ name: Security
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # Daily at midnight UTC
+    - cron: "0 0 * * *" # Daily at midnight UTC
   workflow_dispatch:
   push:
     branches: [main, master]
@@ -39,17 +39,17 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
   gosec:
     name: Gosec Security Scan
@@ -67,10 +67,10 @@ jobs:
       - name: Run Gosec
         uses: securego/gosec@master
         with:
-          args: '-no-fail -fmt sarif -out gosec-results.sarif ./...'
+          args: "-no-fail -fmt sarif -out gosec-results.sarif ./..."
 
       - name: Upload Gosec results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: 'gosec-results.sarif'
+          sarif_file: "gosec-results.sarif"
