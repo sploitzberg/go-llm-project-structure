@@ -156,8 +156,8 @@ make ci
 
 Git hooks run automatically on commits/push. All hook logic lives in `scripts/ci/` with thin wrappers in `.githooks/`:
 
-- **pre-commit**: gofmt, goimports, golangci-lint, tests, hex-arch-guardrail, gosec, go-vet, secrets, license headers, file quality
-- **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies
+- **pre-commit**: gofmt, goimports, golangci-lint, tests, hex-arch-guardrail, gosec, go-vet, secrets, license headers, file quality, complexity (changed files)
+- **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies, complexity (full with CRAP)
 - **commit-msg**: conventional commits format, message length
 - **pre-rebase**: protect main/master branches
 - **prepare-commit-msg**: add branch name to commit message
@@ -169,6 +169,72 @@ Environment variables control behavior:
 - `COVERAGE_THRESHOLD` — Default 80%
 - `GOLANGCI_LINT_TIMEOUT` — Default 2m (pre-commit), 5m (CI)
 - `GO_TEST_FLAGS` — Default `-short` (pre-commit), `-race` (CI)
+
+---
+
+## Complexity Guardrails & Semantic Stability
+
+This project enforces code complexity limits to maintain maintainability and testability. Complexity analysis runs automatically in CI and git hooks.
+
+### Complexity Metrics
+
+- **Cyclomatic Complexity** (gocyclo) - McCabe complexity metric, measures decision points
+- **Cognitive Complexity** (gocognit) - Measures nesting, control flow jumps, and mental effort
+- **CRAP Score** - Combines cyclomatic complexity with test coverage: `CRAP = (cyclomatic² × (1 - coverage/100)³) + cyclomatic`
+  - High CRAP = complex AND poorly tested = dangerous to change
+
+### Layer-Specific Thresholds
+
+Complexity expectations differ by hexagonal architecture layer:
+
+| Layer                | Cyclomatic Max | Cognitive Max | Rationale                                       |
+| -------------------- | -------------- | ------------- | ----------------------------------------------- |
+| `core/domain/`       | 5              | 10            | Pure business logic, must be simple and focused |
+| `core/ports/`        | 3              | 5             | Interface definitions, minimal logic            |
+| `core/services/`     | 10             | 15            | Orchestration allowed, but keep manageable      |
+| `adapter/primary/`   | 15             | 20            | HTTP handlers, CLI — external concerns          |
+| `adapter/secondary/` | 12             | 18            | Database, API clients — external integrations   |
+
+### Configuration
+
+Complexity thresholds are configurable via `.complexity.yml`:
+
+- Enable/disable checks globally
+- Adjust thresholds per layer
+- Configure CRAP scoring threshold (default: 30)
+
+### Guidance for AI Agents
+
+**When writing code:**
+
+- Keep functions small and focused
+- Prefer simple control flow over nested conditions
+- Extract complex logic into smaller, testable functions
+- Domain layer code should be the simplest (pure business rules)
+- If complexity approaches threshold, consider refactoring
+
+**When CRAP score is high:**
+
+- High CRAP indicates complex code with poor test coverage
+- Options:
+  1. **Refactor** - Break down complex function into smaller ones
+  2. **Improve tests** - Add specific assertions to catch mutations
+  3. **Property-based tests** - For pure functions in domain layer
+  4. **Contract tests** - For port interfaces
+
+**Semantic Stability:**
+
+- High complexity = harder to write semantically stable tests
+- Mutation testing (gremlins) validates test effectiveness
+- Aim for high mutation score (80%+) on critical code paths
+- Property-based testing helps ensure invariants hold across inputs
+
+**Before committing complex code:**
+
+- Run `./scripts/ci/pre-push/05-complexity.sh` to check full analysis
+- If CRAP is high, either refactor or improve test coverage
+- Consider adding property-based tests for domain logic
+- Add contract tests for port implementations
 
 ---
 

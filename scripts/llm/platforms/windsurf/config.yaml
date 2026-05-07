@@ -1326,6 +1326,138 @@ structure:
       3. Do NOT report issues that are speculative or low-confidence. All your conclusions should be based on a complete understanding of the codebase.
       4. Remember that if you were given a specific git commit, it may not be checked out and local code states may be different.
 
+  - path: workflows/complexity-aware-coding.md
+    type: file
+    content: |
+      ---
+      description: Write complexity-aware code respecting hexagonal architecture thresholds
+      ---
+
+      # Complexity-Aware Coding Workflow
+
+      You are writing Go code for a production-grade hexagonal architecture project. This workflow ensures your code respects complexity guardrails and maintains semantic stability.
+
+      ## Complexity Thresholds by Layer
+
+      Before writing code, check the layer you're working in and respect these limits:
+
+      | Layer | Cyclomatic Max | Cognitive Max | Rationale |
+      |-------|---------------|---------------|-----------|
+      | `core/domain/` | 5 | 10 | Pure business logic, must be simple and focused |
+      | `core/ports/` | 3 | 5 | Interface definitions, minimal logic |
+      | `core/services/` | 10 | 15 | Orchestration allowed, but keep manageable |
+      | `adapter/primary/` | 15 | 20 | HTTP handlers, CLI — external concerns |
+      | `adapter/secondary/` | 12 | 18 | Database, API clients — external integrations |
+
+      ## Before Writing Code
+
+      1. **Identify the layer** - Determine which hexagonal layer you're working in
+      2. **Review thresholds** - Check the max cyclomatic and cognitive complexity for that layer
+      3. **Plan the function** - Design small, focused functions that stay within limits
+      4. **Consider testability** - Complex code is hard to test with meaningful assertions
+
+      ## While Writing Code
+
+      **Keep functions small:**
+      - Prefer single-responsibility functions
+      - Extract complex logic into smaller helper functions
+      - Avoid deeply nested conditions (use early returns instead)
+      - Use guard clauses to reduce nesting
+
+      **Prefer simple control flow:**
+      - Replace nested if/else with early returns
+      - Use switch statements for multiple conditions
+      - Avoid deep nesting (max 3-4 levels)
+      - Extract complex boolean logic into named functions
+
+      **Domain layer specific:**
+      - Keep business rules simple and declarative
+      - Use value objects to encapsulate complex logic
+      - Pure functions are easier to test and reason about
+      - Aim for cyclomatic ≤ 5, cognitive ≤ 10
+
+      **Services layer specific:**
+      - Orchestrate, don't implement complex logic
+      - Delegate complex operations to domain layer
+      - Use composition over inheritance
+      - Aim for cyclomatic ≤ 10, cognitive ≤ 15
+
+      **Adapters specific:**
+      - Translation logic can be moderately complex
+      - Isolate external concerns from core logic
+      - Use middleware for cross-cutting concerns
+      - Aim for cyclomatic ≤ 12-15, cognitive ≤ 18-20
+
+      ## After Writing Code
+
+      1. **Run complexity check** - `./scripts/ci/pre-commit/19-complexity.sh` for changed files
+      2. **If violations found:**
+         - Refactor function into smaller pieces
+         - Extract helper functions
+         - Simplify control flow
+         - Consider if logic belongs in a different layer
+
+      3. **Check CRAP score** - Run `./scripts/ci/pre-push/05-complexity.sh` for full analysis
+      4. **If CRAP is high:**
+         - Improve test coverage with specific assertions
+         - Add property-based tests for domain logic
+         - Add contract tests for port implementations
+         - Or refactor to reduce complexity
+
+      ## Semantic Stability Considerations
+
+      **High complexity = hard to test semantically:**
+      - Complex code is difficult to write meaningful tests for
+      - Mutation testing (gremlins) validates test effectiveness
+      - Aim for high mutation score (80%+) on critical paths
+
+      **When writing complex code:**
+      - Add property-based tests for pure functions (domain layer)
+      - Add contract tests for port interfaces
+      - Write tests that assert specific behavior, not just execution
+      - Consider invariants that should hold across inputs
+
+      ## Examples
+
+      **Bad (high complexity):**
+      ```go
+      func ProcessOrder(order Order, user User, inventory Inventory, payment Payment) error {
+          if order.Status == "pending" {
+              if user.Active {
+                  if inventory.Available(order.Item) {
+                      if payment.Valid() {
+                          if payment.Amount >= order.Total {
+                              // ... deeply nested logic
+                          }
+                      }
+                  }
+              }
+          }
+      }
+      ```
+
+      **Good (low complexity):**
+      ```go
+      func ProcessOrder(order Order, user User, inventory Inventory, payment Payment) error {
+          if !order.IsPending() {
+              return ErrInvalidOrderStatus
+          }
+          if !user.IsActive() {
+              return ErrInactiveUser
+          }
+          if !inventory.Available(order.Item) {
+              return ErrOutOfStock
+          }
+          if !payment.Valid() {
+              return ErrInvalidPayment
+          }
+          if payment.Amount < order.Total {
+              return ErrInsufficientFunds
+          }
+          return order.Complete()
+      }
+      ```
+
   - path: hooks/pre-read-mosaic-context.sh
     type: file
     content: |
