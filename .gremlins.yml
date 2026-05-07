@@ -1,0 +1,37 @@
+# Gremlins configuration for mutation testing
+# See https://gremlins.dev for full documentation
+
+# Enable/disable gremlins
+enabled: true
+
+# Target directory for mutation testing
+# Change this to test different layers (e.g., internal/core/services)
+target: internal/core/domain
+
+# Mutation threshold (percentage of mutants that should be killed)
+threshold:
+  mutation-score: 80
+
+# Mutators to apply
+# Available: arithmetic, conditionals, functions, variables, constants, etc.
+mutators:
+  - conditionals
+  - functions
+  - arithmetic
+  - variables
+
+# Build configuration
+build:
+  # Test command to run
+  command: go test ./...
+  # Timeout for test execution
+  timeout: 5m
+  # Build tags to use
+  tags: integration
+
+# Dry-run mode: reports mutants without actually testing them
+# Set to false for full mutation testing (slower)
+dry-run: true
+
+# Output format: json, table, or markdown
+output: table

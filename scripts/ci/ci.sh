@@ -74,4 +74,8 @@ echo "==> Running complexity analysis"
 ./scripts/ci/pre-push/00-build.sh
 ./scripts/ci/pre-push/04-outdated-deps.sh
 
+# Run mutation testing (gremlins) for semantic stability
+echo "==> Running mutation testing (gremlins)"
+./scripts/ci/pre-push/06-gremlins.sh
+
 echo "==> OK"

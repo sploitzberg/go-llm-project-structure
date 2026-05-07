@@ -225,13 +225,74 @@ Complexity thresholds are configurable via `.complexity.yml`:
 **Semantic Stability:**
 
 - High complexity = harder to write semantically stable tests
-- Mutation testing (gremlins) validates test effectiveness
+- Mutation testing (Gremlins) validates test effectiveness
 - Aim for high mutation score (80%+) on critical code paths
 - Property-based testing helps ensure invariants hold across inputs
+
+### Mutation Testing with Gremlins
+
+This project uses Gremlins for mutation testing to ensure semantic stability of critical code.
+
+**What is Mutation Testing?**
+
+- Gremlins introduces small mutations (bugs) into code
+- Tests are run against mutated code
+- If tests fail → mutation is "killed" (good)
+- If tests pass → mutation "lived" (test missed the bug)
+
+**Configuration:**
+
+- Configuration file: `.gremlins.yml`
+- Target: Domain layer by default (`internal/core/domain/`)
+- Easily changeable to test other layers
+- Mutation threshold: 80% killed mutants
+- Runs in dry-run mode during CI for speed
+
+**When it Runs:**
+
+- Local: Part of `make ci` pipeline
+- CI: Runs on every push and PR
+- Dry-run mode: Fast reporting without actual test execution
+- Full testing: Available via manual `make mutation-test` (when implemented)
+
+**Mutation Results:**
+
+- **RUNNABLE**: Mutation can be tested (dry-run mode)
+- **NOT COVERED**: Mutation not covered by tests
+- **KILLED**: Test caught the mutation (good)
+- **LIVED**: Test missed the mutation (improve tests)
+- **TIMED OUT**: Tests took too long (mutation broke performance)
+- **NOT VIABLE**: Mutation made build fail
+
+**Guidance for AI Agents:**
+
+**When writing tests for domain logic:**
+
+- Write tests that assert specific behavior, not just execution
+- Use property-based testing for pure functions
+- Test invariants that should hold across inputs
+- Consider edge cases and boundary conditions
+- Avoid overly permissive assertions (e.g., `err == nil` without checking result)
+
+**When mutation score is low:**
+
+- Add specific assertions for expected behavior
+- Test error cases explicitly
+- Add property-based tests for pure functions
+- Consider if the code is over-engineered (simplify if possible)
+- Extract complex logic into smaller, testable functions
+
+**Before committing domain layer changes:**
+
+- Run `make ci` to trigger Gremlins dry-run
+- If mutations live, improve tests to catch them
+- Aim for 80%+ mutation score on critical paths
+- Document any intentional test exclusions in `.gremlins.yml`
 
 **Before committing complex code:**
 
 - Run `./scripts/ci/pre-push/05-complexity.sh` to check full analysis
+- Run `make ci` to trigger Gremlins mutation testing
 - If CRAP is high, either refactor or improve test coverage
 - Consider adding property-based tests for domain logic
 - Add contract tests for port implementations

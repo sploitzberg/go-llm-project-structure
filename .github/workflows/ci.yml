@@ -33,6 +33,9 @@ jobs:
           path: |
             ~/go/bin/goimports
             ~/go/bin/golangci-lint
+            ~/go/bin/gocyclo
+            ~/go/bin/gocognit
+            ~/go/bin/gremlins
             ~/.cache/go-build
           key: ${{ runner.os }}-go-tools-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
@@ -48,6 +51,9 @@ jobs:
         run: |
           go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
           go install github.com/uudashr/gocognit/cmd/gocognit@latest
+
+      - name: Install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
 
       - name: Dependency Review
         if: github.event_name == 'pull_request'
