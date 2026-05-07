@@ -53,6 +53,10 @@ fi
 echo "==> Checking for known vulnerabilities"
 go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+# Run complexity analysis (uses coverage from test run)
+echo "==> Running complexity analysis"
+./scripts/ci/pre-push/05-complexity.sh
+
 # Run architecture and secret checks
 ./scripts/ci/pre-commit/04-hex-arch-guardrail.sh
 ./scripts/ci/pre-commit/07-secrets.sh

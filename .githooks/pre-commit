@@ -25,3 +25,4 @@ cd "$ROOT"
 ./scripts/ci/pre-commit/16-error-wrapping.sh
 ./scripts/ci/pre-commit/17-struct-fields.sh
 ./scripts/ci/pre-commit/18-go-conventions.sh
+./scripts/ci/pre-commit/19-complexity.sh

@@ -1,0 +1,63 @@
+# Complexity Guardrails Configuration
+# Cyclomatic and cognitive complexity thresholds by architecture layer
+# CRAP scoring uses test coverage data
+
+complexity:
+  # Master switch - set to false to disable all complexity checks
+  enabled: true
+
+  # Fail the build on violations (true) or just warn (false)
+  fail_on_violation: true
+
+  # Thresholds by hexagonal architecture layer
+  # Paths are matched against file locations
+  thresholds:
+    core_domain:
+      # Pure business logic - should be simple and focused
+      path_prefix: "internal/core/domain/"
+      cyclomatic: 5      # McCabe complexity
+      cognitive: 10      # Cognitive complexity (nesting, jumps)
+
+    core_ports:
+      # Interface definitions - minimal logic
+      path_prefix: "internal/core/ports/"
+      cyclomatic: 3
+      cognitive: 5
+
+    core_services:
+      # Use case orchestration - moderate complexity allowed
+      path_prefix: "internal/core/services/"
+      cyclomatic: 10
+      cognitive: 15
+
+    adapter_primary:
+      # Inbound adapters (HTTP, CLI) - external concerns
+      path_prefix: "internal/adapter/primary/"
+      cyclomatic: 15
+      cognitive: 20
+
+    adapter_secondary:
+      # Outbound adapters (DB, APIs) - external integrations
+      path_prefix: "internal/adapter/secondary/"
+      cyclomatic: 12
+      cognitive: 18
+
+    cmd:
+      # CLI entry points - bootstrapping code
+      path_prefix: "cmd/"
+      cyclomatic: 15
+      cognitive: 20
+
+    default:
+      # Fallback for unmatched paths
+      cyclomatic: 10
+      cognitive: 15
+
+  # CRAP (Change Risk Anti-Pattern) scoring
+  # Formula: CRAP = (cyclomatic² × (1 - coverage/100)³) + cyclomatic
+  # High CRAP = complex AND poorly tested = dangerous to change
+  crap:
+    enabled: true
+    threshold: 30        # CRAP score above this fails the check
+    # Requires coverage profile from test run
+    coverage_profile: "coverage.out"

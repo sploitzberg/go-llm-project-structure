@@ -36,6 +36,11 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 - **Error Wrapping** - Validates proper error handling with `%w`
 - **Struct Fields** - Ensures exported struct fields have proper tags
 - **Import Order** - Enforces consistent import ordering
+- **Complexity Analysis** - Enforces cyclomatic and cognitive complexity limits with layer-specific thresholds
+  - **Cyclomatic** (gocyclo) - McCabe complexity metric
+  - **Cognitive** (gocognit) - Measures nesting and control flow jumps
+  - **CRAP Scoring** - Combines complexity with test coverage to identify high-risk code
+  - **Configurable** via `.complexity.yml` with architecture-aware thresholds
 
 ### Go Conventions Validation
 
@@ -54,8 +59,8 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 
 ### Git Hooks
 
-- **pre-commit** - Fast checks (formatting, linting, unit tests)
-- **pre-push** - Comprehensive checks (build, all tests, coverage, outdated dependencies)
+- **pre-commit** - Fast checks (formatting, linting, unit tests, complexity on changed files)
+- **pre-push** - Comprehensive checks (build, all tests, coverage, complexity full analysis with CRAP, outdated dependencies)
 - **commit-msg** - Conventional commits format validation
 
 ## Architecture
@@ -108,6 +113,7 @@ Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claud
 - [`AGENTS.md`](AGENTS.md) — Instructions for AI coding assistants
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
+- [`.complexity.yml`](.complexity.yml) — Complexity thresholds and CRAP scoring configuration
 
 ## Makefile Targets
 
