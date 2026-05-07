@@ -112,6 +112,8 @@ help:
 	@echo "  make clean           Remove build artifacts"
 	@echo "  make tidy            go mod tidy"
 	@echo "  make llm-setup       Setup LLM tool configurations"
+	@echo "  make mutation-test   Full mutation testing (slow, thorough)"
+	@echo "  make mutation-test-dry Fast mutation dry-run (CI mode)"
 
 run:
 	go run ./cmd/go-llm-project-structure
@@ -128,6 +130,29 @@ vet:
 
 govulncheck:
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+# Mutation testing with Gremlins (full run, not dry-run)
+# Run on domain layer by default. Override with: make mutation-test TARGET=internal/core/services
+mutation-test:
+	@if ! command -v gremlins >/dev/null 2>&1; then \
+		echo "error: gremlins not found. Install with:"; \
+		echo "  go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0"; \
+		exit 1; \
+	fi
+	@echo "==> Running Gremlins mutation testing..."
+	@echo "    Target: $(or $(TARGET),$(shell grep "^target:" .gremlins.yml 2>/dev/null | head -1 | awk '{print $$2}' || echo internal/core/domain))"
+	@echo "    This may take several minutes. Use 'make mutation-test-dry' for a fast check."
+	gremlins unleash --tags=integration $(or $(TARGET),internal/core/domain)
+
+# Mutation testing dry-run (fast, CI mode)
+mutation-test-dry:
+	@if ! command -v gremlins >/dev/null 2>&1; then \
+		echo "error: gremlins not found. Install with:"; \
+		echo "  go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0"; \
+		exit 1; \
+	fi
+	@echo "==> Running Gremlins mutation testing (dry-run)..."
+	gremlins unleash --dry-run --tags=integration $(or $(TARGET),internal/core/domain)
 
 update:
 	go get -u ./...

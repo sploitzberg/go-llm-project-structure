@@ -250,10 +250,10 @@ This project uses Gremlins for mutation testing to ensure semantic stability of 
 
 **When it Runs:**
 
-- Local: Part of `make ci` pipeline
-- CI: Runs on every push and PR
-- Dry-run mode: Fast reporting without actual test execution
-- Full testing: Available via manual `make mutation-test` (when implemented)
+- Local: Part of `make ci` pipeline (dry-run for speed)
+- CI: Runs on every push and PR (dry-run mode)
+- Full testing: `make mutation-test` — thorough but slow (runs actual mutations)
+- Quick check: `make mutation-test-dry` — fast dry-run, same as CI
 
 **Mutation Results:**
 
