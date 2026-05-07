@@ -115,6 +115,7 @@ Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claud
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
 - [`.complexity.yml`](.complexity.yml) — Complexity thresholds and CRAP scoring configuration
 - [`.gremlins.yml`](.gremlins.yml) — Mutation testing configuration (Gremlins)
+- [`.coupling.yml`](.coupling.yml) — Dependency & coupling analysis thresholds (goda)
 
 ## Makefile Targets
 

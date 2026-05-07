@@ -78,4 +78,8 @@ echo "==> Running complexity analysis"
 echo "==> Running mutation testing (gremlins)"
 ./scripts/ci/pre-push/06-gremlins.sh
 
+# Run coupling analysis
+echo "==> Running coupling analysis"
+./scripts/ci/pre-push/07-coupling.sh
+
 echo "==> OK"

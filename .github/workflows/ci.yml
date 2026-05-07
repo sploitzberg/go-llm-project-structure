@@ -36,6 +36,7 @@ jobs:
             ~/go/bin/gocyclo
             ~/go/bin/gocognit
             ~/go/bin/gremlins
+            ~/go/bin/goda
             ~/.cache/go-build
           key: ${{ runner.os }}-go-tools-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
@@ -54,6 +55,9 @@ jobs:
 
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+
+      - name: Install goda
+        run: go install github.com/loov/goda@latest
 
       - name: Dependency Review
         if: github.event_name == 'pull_request'

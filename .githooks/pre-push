@@ -16,3 +16,5 @@ cd "$ROOT"
 ./scripts/ci/pre-push/03-coverage.sh
 ./scripts/ci/pre-push/04-outdated-deps.sh
 ./scripts/ci/pre-push/05-complexity.sh
+./scripts/ci/pre-push/06-gremlins.sh
+./scripts/ci/pre-push/07-coupling.sh

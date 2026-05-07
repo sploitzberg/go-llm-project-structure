@@ -299,6 +299,34 @@ This project uses Gremlins for mutation testing to ensure semantic stability of 
 
 ---
 
+## Dependency & Coupling Analysis
+
+This project tracks fan-out (number of external packages imported) per hexagonal layer to prevent tight coupling.
+
+**Configuration:** `.coupling.yml` — per-layer thresholds, easily adjustable.
+
+**When it Runs:** Part of `make ci`, pre-push hook, and GitHub Actions.
+
+**Layer Fan-Out Thresholds:**
+
+| Layer                | Max Fan-Out | Rationale                       |
+| -------------------- | ----------- | ------------------------------- |
+| `core/domain/`       | 5           | Must have minimal external deps |
+| `core/ports/`        | 5           | Interface definitions only      |
+| `core/services/`     | 10          | Orchestration layer             |
+| `adapter/primary/`   | 20          | HTTP/CLI — more allowed         |
+| `adapter/secondary/` | 15          | DB/API clients — bounded        |
+
+**Guidance for AI Agents:**
+
+- Before adding a new import to `core/domain/` or `core/ports/`, consider whether it's truly necessary
+- Prefer passing values/interfaces over importing packages in core layers
+- Use value objects or domain types to avoid pulling in external packages
+- High fan-out in domain/ports is a strong signal of leaky abstractions
+- If thresholds need adjusting for the project, update `.coupling.yml` — not the script
+
+---
+
 ## Leveraging Go Package Documentation
 
 Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
