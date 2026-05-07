@@ -42,6 +42,23 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
   - **CRAP Scoring** - Combines complexity with test coverage to identify high-risk code
   - **Configurable** via `.complexity.yml` with architecture-aware thresholds
 
+### Mutation Testing
+
+- **Gremlins** - Validates semantic test quality by introducing small bugs into code
+  - If tests pass with the bug → they are too weak (mutation "lived")
+  - If tests fail → mutation "killed" (good — tests are meaningful)
+  - Target: `core/domain/` by default, configurable via `.gremlins.yml`
+  - Threshold: 80%+ mutants killed
+  - CI: Dry-run on every push (`make mutation-test-dry`)
+  - Full run: `make mutation-test` (slow, thorough)
+
+### Dependency & Coupling Analysis
+
+- **goda** - Tracks fan-out (number of imported packages) per hexagonal layer
+  - Prevents tight coupling between layers
+  - Per-layer thresholds configurable via `.coupling.yml`
+  - Runs on every push (pre-push hook) and in CI
+
 ### Go Conventions Validation
 
 - No `context.Background()` in exported functions
@@ -129,6 +146,8 @@ Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claud
 - `make ci` — Run full CI checks
 - `make install` — Install locally
 - `make llm-setup` — Setup LLM tool configurations
+- `make mutation-test` — Full mutation testing with Gremlins (slow, thorough)
+- `make mutation-test-dry` — Fast mutation dry-run (CI mode)
 
 ## Integration Tests
 
