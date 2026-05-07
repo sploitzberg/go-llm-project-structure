@@ -111,6 +111,7 @@ Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claud
 - [`internal/core/README.md`](internal/core/README.md) — Core architecture overview
 - [`docs/architecture/architecture.md`](docs/architecture/architecture.md) — Visual dependency graph
 - [`AGENTS.md`](AGENTS.md) — Instructions for AI coding assistants
+- [`docs/PROMPT_ENGINEERING.md`](docs/PROMPT_ENGINEERING.md) — Prompt engineering best practices with examples
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
 - [`.complexity.yml`](.complexity.yml) — Complexity thresholds and CRAP scoring configuration
