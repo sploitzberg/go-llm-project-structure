@@ -27,6 +27,8 @@ linters:
     - unconvert
     - gocyclo
     - dupl
+    - funlen
+    - mnd
 
   settings:
     depguard:
@@ -92,6 +94,26 @@ linters:
         - name: error-strings
         - name: error-return
         - name: exported
+        - name: argument-limit
+          arguments: [4]
+
+    funlen:
+      lines: 60
+      statements: 40
+
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "-1"
+        - "2"
 
 formatters:
   enable:
