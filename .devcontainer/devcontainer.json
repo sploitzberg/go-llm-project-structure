@@ -20,6 +20,10 @@
       }
     }
   },
+  // Mount Windsurf config to persist chat history between host and container
+  "mounts": [
+    "source=${localEnv:HOME}/.config/Windsurf,target=/home/vscode/.config/Windsurf,type=bind"
+  ],
   // Use 'forwardPorts' to make a list of ports inside the container available locally
   "forwardPorts": [
     6060
