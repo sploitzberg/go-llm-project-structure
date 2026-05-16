@@ -285,6 +285,7 @@ structure:
           "beforeFileEdit": [
             {
               "command": ".cursor/hooks/before-file-edit.sh",
+              "failClosed": true,
               "matcher": {
                 "file_pattern": "*.go"
               }
@@ -300,7 +301,8 @@ structure:
           ],
           "beforeShellExecution": [
             {
-              "command": ".cursor/hooks/before-shell-execution.sh"
+              "command": ".cursor/hooks/before-shell-execution.sh",
+              "failClosed": true
             }
           ],
           "beforeSubmitPrompt": [
@@ -466,41 +468,32 @@ structure:
       #!/usr/bin/env bash
       # Cursor before-shell-execution hook
       # Blocks dangerous commands before execution
+      # Outputs JSON with permission decision (Cursor expects stdout JSON, not stderr text)
 
       set -euo pipefail
 
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
       # Read JSON input from stdin
       input=$(cat)
-
-      # Parse command from input
       command=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
 
       if [[ -z "$command" ]]; then
+        echo '{"permission": "allow"}'
         exit 0
       fi
 
       # List of dangerous commands to block
       dangerous_commands=(
-        "rm -rf /"
-        "dd if="
-        "mkfs"
-        ":(){:|:&};:"
-        "chmod -R 777"
-        "chown -R"
-        "curl | sh"
-        "wget | sh"
-        "> /dev/sd"
-        "> /dev/hd"
+        "rm -rf /" "dd if=" "mkfs" ":(){:|:&};:" "chmod -R 777"
+        "chown -R" "curl | sh" "wget | sh" "> /dev/sd" "> /dev/hd"
       )
 
-      # Check if command contains dangerous patterns
       for dangerous in "${dangerous_commands[@]}"; do
         if [[ "$command" == *"$dangerous"* ]]; then
-          echo "error: Dangerous command blocked: $command" >&2
-          exit 2
+          jq -n \
+            --arg cmd "$command" \
+            --arg reason "dangerous pattern detected" \
+            '{permission: "deny", user_message: "Command blocked for safety: \($cmd)", agent_message: "Hook blocked dangerous command: \($cmd) — \($reason)"}'
+          exit 0
         fi
       done
 
@@ -508,11 +501,14 @@ structure:
       protected_files=("go.mod" "go.sum" ".golangci.yml" "Taskfile")
       for protected in "${protected_files[@]}"; do
         if [[ "$command" == *"$protected"* ]] && [[ "$command" == *"rm"* ]] || [[ "$command" == *"mv"* ]]; then
-          echo "error: Protected file modification blocked: $protected" >&2
-          exit 2
+          jq -n \
+            --arg file "$protected" \
+            '{permission: "deny", user_message: "Protected file modification blocked: \($file)", agent_message: "Use \u0027go mod tidy\u0027 for go.mod/go.sum, or task/config tools for other protected files."}'
+          exit 0
         fi
       done
 
+      echo '{"permission": "allow"}'
       exit 0
 
   - path: hooks/before-submit-prompt.sh

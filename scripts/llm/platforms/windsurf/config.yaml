@@ -677,12 +677,6 @@ structure:
     content: |
       {
         "hooks": {
-          "pre_read_code": [
-            {
-              "command": ".windsurf/hooks/pre-read.sh",
-              "show_output": false
-            }
-          ],
           "pre_write_code": [
             {
               "command": ".windsurf/hooks/pre-write.sh",
@@ -716,12 +710,6 @@ structure:
           "post_cascade_response_with_transcript": [
             {
               "command": ".windsurf/hooks/post-write.sh",
-              "show_output": false
-            }
-          ],
-          "post_setup_worktree": [
-            {
-              "command": ".windsurf/hooks/post-setup-worktree.sh",
               "show_output": false
             }
           ]
@@ -760,34 +748,6 @@ structure:
       echo "  4. Functions ≤4 parameters where possible"
       echo "  5. No magic numbers — use named constants"
       echo "=== END CONTEXT ==="
-
-      exit 0
-
-  - path: hooks/pre-read.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Pre-read hook: Minimal layer identification only
-      # Verbose context injection moved to pre-user-prompt.sh to minimize token waste
-
-      file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$file_path" ]]; then
-        exit 0
-      fi
-
-      # Minimal layer identification (1 line max per file read)
-      if [[ "$file_path" == internal/core/domain/* ]]; then
-        echo "Layer: domain"
-      elif [[ "$file_path" == internal/core/ports/* ]]; then
-        echo "Layer: port"
-      elif [[ "$file_path" == internal/core/services/* ]]; then
-        echo "Layer: service"
-      elif [[ "$file_path" == internal/adapter/* ]]; then
-        echo "Layer: adapter"
-      elif [[ "$file_path" == internal/config/* ]]; then
-        echo "Layer: config"
-      fi
 
       exit 0
 
@@ -995,52 +955,6 @@ structure:
           echo "⚠️  Warning: Potentially destructive command: $command_line"
           echo "Pattern: $pattern"
           # Don't block, just warn
-        fi
-      done
-
-      exit 0
-
-  - path: hooks/post-setup-worktree.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Post-setup worktree hook
-      # Initializes worktree with necessary files and configurations
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse worktree info from input
-      worktree_path=$(echo "$input" | jq -r '.tool_info.worktree_path // empty' 2>/dev/null || echo "")
-      root_workspace_path=$(echo "$input" | jq -r '.tool_info.root_workspace_path // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$worktree_path" ]]; then
-        exit 0
-      fi
-
-      echo "🌳 Worktree created: $worktree_path" >&2
-
-      # Copy .env.example to .env if it exists
-      if [[ -f "$root_workspace_path/.env.example" ]]; then
-        if [[ ! -f "$worktree_path/.env" ]]; then
-          cp "$root_workspace_path/.env.example" "$worktree_path/.env"
-          echo "  ✓ Copied .env.example to .env" >&2
-        fi
-      fi
-
-      # Copy other untracked configuration files if needed
-      for config_file in "config/local.yaml" "config/dev.yaml"; do
-        if [[ -f "$root_workspace_path/$config_file" ]]; then
-          if [[ ! -f "$worktree_path/$config_file" ]]; then
-            mkdir -p "$(dirname "$worktree_path/$config_file")"
-            cp "$root_workspace_path/$config_file" "$worktree_path/$config_file"
-            echo "  ✓ Copied $config_file" >&2
-          fi
         fi
       done
 
