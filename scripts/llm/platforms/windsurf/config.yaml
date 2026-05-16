@@ -683,12 +683,6 @@ structure:
               "show_output": false
             }
           ],
-          "post_read_code": [
-            {
-              "command": ".windsurf/hooks/post-read-code.sh",
-              "show_output": false
-            }
-          ],
           "pre_write_code": [
             {
               "command": ".windsurf/hooks/pre-write.sh",
@@ -707,28 +701,10 @@ structure:
               "show_output": true
             }
           ],
-          "post_run_command": [
-            {
-              "command": ".windsurf/hooks/post-run-command.sh",
-              "show_output": false
-            }
-          ],
-          "pre_mcp_tool_use": [
-            {
-              "command": ".windsurf/hooks/pre-mcp-tool-use.sh",
-              "show_output": false
-            }
-          ],
-          "post_mcp_tool_use": [
-            {
-              "command": ".windsurf/hooks/post-mcp-tool-use.sh",
-              "show_output": false
-            }
-          ],
           "pre_user_prompt": [
             {
               "command": ".windsurf/hooks/pre-user-prompt.sh",
-              "show_output": false
+              "show_output": true
             }
           ],
           "post_cascade_response": [
@@ -752,24 +728,65 @@ structure:
         }
       }
 
+  - path: hooks/pre-user-prompt.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Pre-user-prompt hook: Inject architecture, performance, and security context
+      # Fires once per user interaction before LLM begins reasoning
+      # This is the optimal injection point — influences entire thought process
+
+      echo "=== PROJECT CONTEXT ==="
+      echo "Architecture: Hexagonal (Ports & Adapters). Dependencies point inward."
+      echo "  - core/domain/: pure business logic, zero internal imports"
+      echo "  - core/ports/: interfaces only, depends on domain"
+      echo "  - core/services/: use cases, depends on domain + ports"
+      echo "  - adapter/: infrastructure implementations (DB, HTTP, APIs)"
+      echo ""
+      echo "Performance: Consider goroutines/channels for I/O-bound operations."
+      echo "  - Use errgroup for bounded concurrency"
+      echo "  - Pass context.Context through full call chain"
+      echo "  - Benchmark critical paths before optimizing"
+      echo ""
+      echo "Security: Validate all inputs. Wrap errors with %w. No hardcoded secrets."
+      echo "  - Use os.Getenv or secure config loader"
+      echo "  - No sensitive data in logs (passwords, tokens, PII)"
+      echo "  - Parameterise SQL queries — no string concatenation"
+      echo ""
+      echo "Before outputting code, verify:"
+      echo "  1. No adapter imports in core/domain/ or core/ports/"
+      echo "  2. Errors checked and wrapped with %w"
+      echo "  3. Tests would catch logic bugs (assert outputs, not just nil errors)"
+      echo "  4. Functions ≤4 parameters where possible"
+      echo "  5. No magic numbers — use named constants"
+      echo "=== END CONTEXT ==="
+
+      exit 0
+
   - path: hooks/pre-read.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Generic pre-read hook for Go files
-      # Used by Windsurf and similar platforms
+      # Pre-read hook: Minimal layer identification only
+      # Verbose context injection moved to pre-user-prompt.sh to minimize token waste
 
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
+      file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
 
-      # Run context injection
-      if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
-        ./scripts/llm/hooks/pre-read-context-injection.sh "$1" 2>/dev/null || true
+      if [[ -z "$file_path" ]]; then
+        exit 0
       fi
 
-      # Run layer awareness
-      if [ -f "scripts/llm/hooks/pre-read-layer-awareness.sh" ]; then
-        ./scripts/llm/hooks/pre-read-layer-awareness.sh "$1" 2>/dev/null || true
+      # Minimal layer identification (1 line max per file read)
+      if [[ "$file_path" == internal/core/domain/* ]]; then
+        echo "Layer: domain"
+      elif [[ "$file_path" == internal/core/ports/* ]]; then
+        echo "Layer: port"
+      elif [[ "$file_path" == internal/core/services/* ]]; then
+        echo "Layer: service"
+      elif [[ "$file_path" == internal/adapter/* ]]; then
+        echo "Layer: adapter"
+      elif [[ "$file_path" == internal/config/* ]]; then
+        echo "Layer: config"
       fi
 
       exit 0
@@ -790,10 +807,9 @@ structure:
       if [[ "$file_path" == *.go ]]; then
         # Format Go files using golangci-lint formatters
         # Disable expensive linters (complexity, duplication) for fast LLM iteration
-        golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
+        golangci-lint run --fix --fast --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
 
-        # Run fast quality checks
-        go vet ./... 2>/dev/null || true
+        # Run architecture guardrail only (per-file go vet runs in post_write_code)
         ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
 
         # Run LLM-specific hooks
@@ -864,8 +880,8 @@ structure:
       fi
 
       # Run fast blocking linters before write (depguard, gosec, errcheck)
-      # These checks can block the write if violations are found
-      golangci-lint run --disable-all --enable=depguard,gosec,errcheck --out-format=colored-line-number "$file_path" 2>&1 | head -20
+      # --fast ensures only fast linters run; plain output avoids ANSI color codes in LLM context
+      golangci-lint run --fast --disable-all --enable=depguard,gosec,errcheck --out-format=line-number "$file_path" 2>&1 | head -30
       lint_exit=$?
 
       if [[ $lint_exit -ne 0 ]]; then
@@ -981,101 +997,6 @@ structure:
           # Don't block, just warn
         fi
       done
-
-      exit 0
-
-  - path: hooks/post-mcp-tool-use.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Post-MCP tool use hook
-      # Logs MCP tool usage for analytics and monitoring
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse MCP tool info
-      mcp_server_name=$(echo "$input" | jq -r '.tool_info.mcp_server_name // empty' 2>/dev/null || echo "")
-      mcp_tool_name=$(echo "$input" | jq -r '.tool_info.mcp_tool_name // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
-        # Log the tool usage (could be sent to analytics service)
-        echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/post-read-code.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Post-read code hook
-      # Tracks file access patterns for analytics
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse file path from input
-      file_path=$(echo "$input" | jq -r '.tool_info.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$file_path" ]]; then
-        exit 0
-      fi
-
-      # Track file access (could be sent to analytics service)
-      echo "📖 File read: $file_path" >&2
-
-      # Track which layers are being accessed most frequently
-      if [[ "$file_path" == internal/core/domain/* ]]; then
-        echo "  Layer: core/domain" >&2
-      elif [[ "$file_path" == internal/core/ports/* ]]; then
-        echo "  Layer: core/ports" >&2
-      elif [[ "$file_path" == internal/core/services/* ]]; then
-        echo "  Layer: core/services" >&2
-      elif [[ "$file_path" == internal/adapter/primary/* ]]; then
-        echo "  Layer: adapter/primary" >&2
-      elif [[ "$file_path" == internal/adapter/secondary/* ]]; then
-        echo "  Layer: adapter/secondary" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/post-run-command.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Post-run command hook
-      # Logs command execution results for audit trail
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse command info from input
-      command_line=$(echo "$input" | jq -r '.tool_info.command_line // empty' 2>/dev/null || echo "")
-      cwd=$(echo "$input" | jq -r '.tool_info.cwd // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$command_line" ]]; then
-        # Log command execution (could be sent to analytics service)
-        echo "🚀 Command executed: $command_line" >&2
-        if [[ -n "$cwd" ]]; then
-          echo "  Working directory: $cwd" >&2
-        fi
-      fi
 
       exit 0
 

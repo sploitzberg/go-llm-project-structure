@@ -303,21 +303,6 @@ structure:
               "command": ".cursor/hooks/before-shell-execution.sh"
             }
           ],
-          "afterShellExecution": [
-            {
-              "command": ".cursor/hooks/after-shell-execution.sh"
-            }
-          ],
-          "beforeMCPExecution": [
-            {
-              "command": ".cursor/hooks/before-mcp-execution.sh"
-            }
-          ],
-          "afterMCPExecution": [
-            {
-              "command": ".cursor/hooks/after-mcp-execution.sh"
-            }
-          ],
           "beforeSubmitPrompt": [
             {
               "command": ".cursor/hooks/before-submit-prompt.sh"
@@ -328,34 +313,9 @@ structure:
               "command": ".cursor/hooks/after-agent-response.sh"
             }
           ],
-          "afterAgentThought": [
-            {
-              "command": ".cursor/hooks/after-agent-thought.sh"
-            }
-          ],
-          "subagentStart": [
-            {
-              "command": ".cursor/hooks/subagent-start.sh"
-            }
-          ],
-          "subagentStop": [
-            {
-              "command": ".cursor/hooks/subagent-stop.sh"
-            }
-          ],
           "sessionStart": [
             {
               "command": ".cursor/hooks/session-start.sh"
-            }
-          ],
-          "sessionEnd": [
-            {
-              "command": ".cursor/hooks/session-end.sh"
-            }
-          ],
-          "workspaceOpen": [
-            {
-              "command": ".cursor/hooks/workspace-open.sh"
             }
           ]
         }
@@ -365,32 +325,25 @@ structure:
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor before-read-file hook
-      # Injects architecture context before LLM reads code
+      # Pre-read hook: Minimal layer identification only
+      # Verbose context injection moved to before-submit-prompt.sh
 
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse file path from input
-      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+      file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
 
       if [[ -z "$file_path" ]]; then
         exit 0
       fi
 
-      # Run context injection
-      if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
-        ./scripts/llm/hooks/pre-read-context-injection.sh "$file_path" 2>/dev/null || true
-      fi
-
-      # Run layer awareness
-      if [ -f "scripts/llm/hooks/pre-read-layer-awareness.sh" ]; then
-        ./scripts/llm/hooks/pre-read-layer-awareness.sh "$file_path" 2>/dev/null || true
+      if [[ "$file_path" == internal/core/domain/* ]]; then
+        echo "Layer: domain"
+      elif [[ "$file_path" == internal/core/ports/* ]]; then
+        echo "Layer: port"
+      elif [[ "$file_path" == internal/core/services/* ]]; then
+        echo "Layer: service"
+      elif [[ "$file_path" == internal/adapter/* ]]; then
+        echo "Layer: adapter"
+      elif [[ "$file_path" == internal/config/* ]]; then
+        echo "Layer: config"
       fi
 
       exit 0
@@ -451,8 +404,8 @@ structure:
       fi
 
       # Run fast blocking linters before write (depguard, gosec, errcheck)
-      # These checks can block the write if violations are found
-      golangci-lint run --disable-all --enable=depguard,gosec,errcheck --out-format=colored-line-number "$file_path" 2>&1 | head -20
+      # --fast ensures only fast linters; plain output avoids ANSI codes in LLM context
+      golangci-lint run --fast --disable-all --enable=depguard,gosec,errcheck --out-format=line-number "$file_path" 2>&1 | head -30
       lint_exit=$?
 
       if [[ $lint_exit -ne 0 ]]; then
@@ -488,7 +441,7 @@ structure:
 
       # Format Go files using golangci-lint formatters
       # Disable expensive linters (complexity, duplication) for fast LLM iteration
-      golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
+      golangci-lint run --fix --fast --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
 
       # Run fast quality checks
       go vet "$file_path" 2>/dev/null || true
@@ -562,62 +515,37 @@ structure:
 
       exit 0
 
-  - path: hooks/after-shell-execution.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor after-shell-execution hook
-      # Logs command execution results for audit trail
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse command and exit code from input
-      command=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
-      exit_code=$(echo "$input" | jq -r '.exit_code // 0' 2>/dev/null || echo "0")
-
-      if [[ -z "$command" ]]; then
-        exit 0
-      fi
-
-      # Log command execution
-      if [[ $exit_code -ne 0 ]]; then
-        echo "Command failed: $command (exit code: $exit_code)" >&2
-      fi
-
-      exit 0
-
   - path: hooks/before-submit-prompt.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor before-submit-prompt hook
-      # Logs user prompts for auditing
+      # Pre-user-prompt hook: Inject architecture, performance, and security context
+      # Fires once per user interaction before LLM begins reasoning
 
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse user prompt from input
-      user_prompt=$(echo "$input" | jq -r '.user_prompt // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$user_prompt" ]]; then
-        exit 0
-      fi
-
-      # Check for potential policy violations
-      if echo "$user_prompt" | grep -qi "password\|secret\|api.key\|token"; then
-        echo "warning: Prompt mentions sensitive terms" >&2
-      fi
+      echo "=== PROJECT CONTEXT ==="
+      echo "Architecture: Hexagonal (Ports & Adapters). Dependencies point inward."
+      echo "  - core/domain/: pure business logic, zero internal imports"
+      echo "  - core/ports/: interfaces only, depends on domain"
+      echo "  - core/services/: use cases, depends on domain + ports"
+      echo "  - adapter/: infrastructure implementations (DB, HTTP, APIs)"
+      echo ""
+      echo "Performance: Consider goroutines/channels for I/O-bound operations."
+      echo "  - Use errgroup for bounded concurrency"
+      echo "  - Pass context.Context through full call chain"
+      echo "  - Benchmark critical paths before optimizing"
+      echo ""
+      echo "Security: Validate all inputs. Wrap errors with %w. No hardcoded secrets."
+      echo "  - Use os.Getenv or secure config loader"
+      echo "  - No sensitive data in logs (passwords, tokens, PII)"
+      echo "  - Parameterise SQL queries — no string concatenation"
+      echo ""
+      echo "Before outputting code, verify:"
+      echo "  1. No adapter imports in core/domain/ or core/ports/"
+      echo "  2. Errors checked and wrapped with %w"
+      echo "  3. Tests would catch logic bugs (assert outputs, not just nil errors)"
+      echo "  4. Functions ≤4 parameters where possible"
+      echo "  5. No magic numbers — use named constants"
+      echo "=== END CONTEXT ==="
 
       exit 0
 
@@ -625,156 +553,19 @@ structure:
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor after-agent-response hook
-      # Logs agent responses for analysis
+      # Post-response hook: Format all modified Go files after agent response
 
       set -euo pipefail
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
 
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse response from input
-      response=$(echo "$input" | jq -r '.response // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$response" ]]; then
-        exit 0
-      fi
-
-      # Log response length for analytics
-      response_length=$(echo "$response" | wc -c)
-      if [[ $response_length -gt 10000 ]]; then
-        echo "info: Large response generated (${response_length} chars)" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/after-agent-thought.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor after-agent-thought hook
-      # Logs agent thought process for debugging
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse thought from input
-      thought=$(echo "$input" | jq -r '.thought // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$thought" ]]; then
-        exit 0
-      fi
-
-      # Log thought for debugging (optional)
-      exit 0
-
-  - path: hooks/before-mcp-execution.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor before-mcp-execution hook
-      # Logs MCP tool usage before execution
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse MCP tool info from input
-      mcp_server_name=$(echo "$input" | jq -r '.mcp_server_name // empty' 2>/dev/null || echo "")
-      mcp_tool_name=$(echo "$input" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$mcp_server_name" ]] && [[ -n "$mcp_tool_name" ]]; then
-        echo "info: MCP tool invocation: $mcp_server_name/$mcp_tool_name" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/after-mcp-execution.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor after-mcp-execution hook
-      # Logs MCP tool usage after execution
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse MCP tool info from input
-      mcp_server_name=$(echo "$input" | jq -r '.mcp_server_name // empty' 2>/dev/null || echo "")
-      mcp_tool_name=$(echo "$input" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
-      mcp_result=$(echo "$input" | jq -r '.mcp_result // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$mcp_server_name" ]] && [[ -n "$mcp_tool_name" ]]; then
-        echo "info: MCP tool completed: $mcp_server_name/$mcp_tool_name" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/subagent-start.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor subagent-start hook
-      # Logs when a subagent starts
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse subagent info from input
-      subagent_id=$(echo "$input" | jq -r '.subagent_id // empty' 2>/dev/null || echo "")
-      model=$(echo "$input" | jq -r '.model // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$subagent_id" ]]; then
-        echo "info: Subagent started: $subagent_id (model: $model)" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/subagent-stop.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor subagent-stop hook
-      # Logs when a subagent stops
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse subagent info from input
-      subagent_id=$(echo "$input" | jq -r '.subagent_id // empty' 2>/dev/null || echo "")
-      duration_ms=$(echo "$input" | jq -r '.duration_ms // empty' 2>/dev/null || echo "")
-      modified_files=$(echo "$input" | jq -r '.modified_files[]' 2>/dev/null || echo "")
-
-      if [[ -n "$subagent_id" ]]; then
-        echo "info: Subagent stopped: $subagent_id (duration: ${duration_ms}ms)" >&2
-      fi
+      # Find modified Go files and format them
+      git diff --name-only --diff-filter=M 2>/dev/null | grep '\.go$' | while read -r f; do
+        if [[ -f "$f" ]]; then
+          golangci-lint run --fix --fast --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$f" 2>/dev/null || true
+        fi
+      done
 
       exit 0
 
@@ -802,54 +593,5 @@ structure:
 
       # Add additional context for the session
       echo "{\"additional_context\": \"Working in Go project with Hexagonal Architecture. Follow AGENTS.md for guidelines.\"}"
-
-      exit 0
-
-  - path: hooks/session-end.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor session-end hook
-      # Logs session end for analytics
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse session info from input
-      session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null || echo "")
-      reason=$(echo "$input" | jq -r '.reason // empty' 2>/dev/null || echo "")
-      duration_ms=$(echo "$input" | jq -r '.duration_ms // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$session_id" ]]; then
-        echo "info: Session ended: $session_id (reason: $reason, duration: ${duration_ms}ms)" >&2
-      fi
-
-      exit 0
-
-  - path: hooks/workspace-open.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor workspace-open hook
-      # Initializes workspace with necessary configurations
-
-      set -euo pipefail
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse workspace info from input
-      workspace_roots=$(echo "$input" | jq -r '.workspace_roots[]' 2>/dev/null || echo "")
-
-      # Return plugin paths if any
-      echo "{\"pluginPaths\": []}"
 
       exit 0
