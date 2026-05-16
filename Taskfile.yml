@@ -87,6 +87,26 @@ tasks:
     cmds:
       - go test -count=1 -race -tags=integration ./...
 
+  benchmark:
+    desc: Run benchmark tests
+    cmds:
+      - go test -bench=. -benchmem ./...
+
+  sbom:
+    desc: Generate Software Bill of Materials (SBOM)
+    cmds:
+      - sh -c "syft . -o spdx-json > sbom.json"
+
+  pprof:
+    desc: Run with pprof profiling enabled
+    cmds:
+      - ENABLE_PPROF=true go run ./cmd/go-llm-project-structure
+
+  fuzz:
+    desc: Run fuzz tests (Go 1.18+)
+    cmds:
+      - go test -fuzz=. -fuzztime=30s ./...
+
   lint:
     desc: Run golangci-lint
     cmds:

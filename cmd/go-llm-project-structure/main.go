@@ -20,8 +20,25 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+	// #nosec G108 -- pprof is intentionally exposed for profiling (only with ENABLE_PPROF=true)
+	_ "net/http/pprof"
+	"os"
+)
 
 func main() {
+	// Enable pprof profiling if ENABLE_PPROF is set
+	if os.Getenv("ENABLE_PPROF") == "true" {
+		go func() {
+			fmt.Println("Profiling enabled on http://localhost:6060")
+			// #nosec G114 -- pprof server without timeouts is acceptable for dev profiling
+			if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+				fmt.Printf("pprof server error: %v\n", err)
+			}
+		}()
+	}
+
 	fmt.Println("Hello, World!")
 }

@@ -1,5 +1,7 @@
 # go-llm-project-structure
 
+[![codecov](https://codecov.io/gh/sploitzberg/go-llm-project-structure/branch/main/graph/badge.svg)](https://codecov.io/gh/sploitzberg/go-llm-project-structure)
+
 A Go project template implementing strict **Hexagonal Architecture** (Ports & Adapters pattern) with LLM coding assistant tooling.
 
 ## Quick Start
@@ -9,11 +11,20 @@ A Go project template implementing strict **Hexagonal Architecture** (Ports & Ad
 git clone https://github.com/sploitzberg/go-llm-project-structure.git
 cd go-llm-project-structure
 
+# Install dependencies
+go mod download
+
 # Setup LLM tool configuration
 task llm-setup
 
 # Select your LLM provider (Cursor, Claude, Windsurf, Continue, Copilot, or Codex)
 # Sensible defaults are applied automatically
+
+# Run the application
+go run cmd/go-llm-project-structure/main.go
+
+# Run tests
+task test
 ```
 
 That's it! Your LLM coding assistant now has comprehensive Go-specific rules, skills, agents, and hooks configured to enforce clean, production-ready, robust Go code following Hexagonal Architecture.
@@ -51,6 +62,69 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
   - Threshold: 80%+ mutants killed
   - CI: Dry-run on every push (`task mutation-test-dry`)
   - Full run: `task mutation-test` (slow, thorough)
+
+### Development Container
+
+This project includes a Dev Container configuration for a consistent development environment.
+
+### Using Dev Container
+
+**VS Code / VSCodium:**
+
+1. Install the "Dev Containers" extension
+2. Command Palette → "Dev Containers: Reopen in Container"
+3. First build takes 2-5 minutes (cached after)
+
+**Windsurf:**
+
+1. Command Palette → "Dev Containers: Reopen in Container"
+2. Note: Windsurf may show all parent folders in file explorer (known limitation)
+3. Container is functional despite this UI issue
+
+**Manual attachment (fallback):**
+
+```bash
+# Build and start container
+cd .devcontainer
+docker-compose build
+docker-compose up -d
+
+# Find container name
+docker ps
+
+# Attach to running container (replace with actual name)
+docker exec -it <container-name> bash
+```
+
+### Container includes
+
+- Go 1.26
+- golangci-lint
+- Task (task runner)
+- jq, yq (YAML/JSON processors)
+- Gremlins (mutation testing)
+- goda (dependency analysis)
+- Pre-configured git hooks
+
+### Docker (Optional)
+
+This project includes optional Docker support for deployment:
+
+**Build and run with Docker:**
+
+```bash
+docker compose up --build
+```
+
+**Build image only:**
+
+```bash
+docker build -t go-llm-project-structure .
+```
+
+See [README.Docker.md](README.Docker.md) for more details.
+
+Note: Docker is optional for development. Use the dev container or local Go tooling instead.
 
 ### Dependency & Coupling Analysis
 

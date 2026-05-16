@@ -1,0 +1,3 @@
+# Exclude other projects in parent directory
+../*
+!.git

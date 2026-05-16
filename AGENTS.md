@@ -146,6 +146,8 @@ go test -race -count=1 ./...
 task integration             # Integration tests
 go test -race -tags=integration ./...
 go test -coverprofile=coverage.out ./...  # With coverage
+task benchmark              # Benchmark tests for performance-critical code
+task fuzz                   # Fuzz tests for security-critical code (Go 1.18+)
 ```
 
 </testing>

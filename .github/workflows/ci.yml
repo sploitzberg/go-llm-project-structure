@@ -75,3 +75,34 @@ jobs:
           name: coverage-${{ matrix.go-version }}
           path: coverage.out
           retention-days: 7
+
+      - name: Run benchmarks
+        run: go test -bench=. -benchmem ./...
+
+      - name: Generate SBOM
+        run: |
+          go install github.com/anchore/syft/cmd/syft@latest
+          syft . -o spdx-json > sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.go-version }}
+          path: sbom.json
+          retention-days: 30
+
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.26"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - name: Run fuzz tests
+        run: go test -fuzz=. -fuzztime=60s ./...
