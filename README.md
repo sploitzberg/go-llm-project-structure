@@ -50,8 +50,7 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 - **Complexity Analysis** - Enforces cyclomatic and cognitive complexity limits with layer-specific thresholds
   - **Cyclomatic** (gocyclo) - McCabe complexity metric
   - **Cognitive** (gocognit) - Measures nesting and control flow jumps
-  - **CRAP Scoring** - Combines complexity with test coverage to identify high-risk code
-  - **Configurable** via `.complexity.yml` with architecture-aware thresholds
+  - **Configurable** via golangci-lint configuration with architecture-aware thresholds
 
 ### Mutation Testing
 
@@ -151,7 +150,7 @@ Note: Docker is optional for development. Use the dev container or local Go tool
 ### Git Hooks
 
 - **pre-commit** - Fast checks (formatting, linting, unit tests, complexity on changed files)
-- **pre-push** - Comprehensive checks (build, all tests, coverage, complexity full analysis with CRAP, outdated dependencies)
+- **pre-push** - Comprehensive checks (build, all tests, coverage, complexity full analysis, outdated dependencies)
 - **commit-msg** - Conventional commits format validation
 
 ## Architecture
@@ -181,7 +180,6 @@ This project supports integration with various LLM platforms through platform-sp
 - [`docs/PROMPT_ENGINEERING.md`](docs/PROMPT_ENGINEERING.md) — Prompt engineering best practices with examples
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
-- [`.complexity.yml`](.complexity.yml) — Complexity thresholds and CRAP scoring configuration
 - [`.gremlins.yml`](.gremlins.yml) — Mutation testing configuration (Gremlins)
 - [`.coupling.yml`](.coupling.yml) — Dependency & coupling analysis thresholds (goda)
 
@@ -198,6 +196,10 @@ This project supports integration with various LLM platforms through platform-sp
 - `task llm-setup` — Setup LLM tool configurations
 - `task mutation-test` — Full mutation testing with Gremlins (slow, thorough)
 - `task mutation-test-dry` — Fast mutation dry-run (CI mode)
+- `task benchmark` — Run benchmark tests
+- `task sbom` — Generate Software Bill of Materials (SBOM)
+- `task pprof` — Run application with pprof profiling enabled
+- `task fuzz` — Run fuzz tests for security-critical code
 
 ## Integration Tests
 
