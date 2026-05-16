@@ -127,6 +127,11 @@ tasks:
     cmds:
       - ./scripts/llm/llm-setup.sh
 
+  rename:
+    desc: Rename repository (update module path, URLs, and optional container name)
+    cmds:
+      - ./scripts/setup/rename-repo.sh {{.CLI_ARGS}}
+
   clean-llm-cursor:
     desc: Remove Cursor LLM tool configuration
     cmds:
