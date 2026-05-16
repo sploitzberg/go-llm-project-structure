@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: go-llm-project-structure
     build:
       context: .
       dockerfile: Dockerfile

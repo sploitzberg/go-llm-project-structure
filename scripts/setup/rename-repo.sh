@@ -95,6 +95,14 @@ replace_in_file "scripts/llm/platforms/copilot/config.yaml" "$CURRENT_MODULE" "$
 # Update AGENTS.md (root level)
 replace_in_file "AGENTS.md" "$CURRENT_MODULE" "$NEW_MODULE"
 
+# Update container name in docker-compose.yml (optional)
+read -p "Update container name to match new repo? (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    replace_in_file ".devcontainer/docker-compose.yml" "container_name: go-llm-project-structure" "container_name: ${NEW_REPO_NAME}"
+    echo "✓ Updated container name in docker-compose.yml"
+fi
+
 echo ""
 echo "Running go mod tidy..."
 go mod tidy
