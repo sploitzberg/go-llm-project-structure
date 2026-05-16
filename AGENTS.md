@@ -183,7 +183,7 @@ task ci
 Git hooks run automatically on commits/push. All hook logic lives in `scripts/ci/` with thin wrappers in `.githooks/`:
 
 - **pre-commit**: gofmt, goimports, golangci-lint, tests, hex-arch-guardrail, gosec, go-vet, secrets, license headers, file quality, complexity (changed files)
-- **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies, complexity (full with CRAP)
+- **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies, complexity (full analysis)
 - **commit-msg**: conventional commits format, message length
 - **pre-rebase**: protect main/master branches
 - **prepare-commit-msg**: add branch name to commit message
@@ -208,8 +208,6 @@ This project enforces code complexity limits to maintain maintainability and tes
 
 - **Cyclomatic Complexity** (gocyclo) - McCabe complexity metric, measures decision points
 - **Cognitive Complexity** (gocognit) - Measures nesting, control flow jumps, and mental effort
-- **CRAP Score** - Combines cyclomatic complexity with test coverage: `CRAP = (cyclomatic² × (1 - coverage/100)³) + cyclomatic`
-  - High CRAP = complex AND poorly tested = dangerous to change
 
 ### Layer-Specific Thresholds
 
@@ -225,11 +223,10 @@ Complexity expectations differ by hexagonal architecture layer:
 
 ### Configuration
 
-Complexity thresholds are configurable via `.complexity.yml`:
+Complexity thresholds are configurable via `.golangci.yml`:
 
 - Enable/disable checks globally
-- Adjust thresholds per layer
-- Configure CRAP scoring threshold (default: 30)
+- Adjust thresholds per layer via `gocyclo` and `gocognit` linter settings
 
 ### Guidance for AI Agents
 
@@ -241,9 +238,9 @@ Complexity thresholds are configurable via `.complexity.yml`:
 - Domain layer code should be the simplest (pure business rules)
 - If complexity approaches threshold, consider refactoring
 
-**When CRAP score is high:**
+**When complexity is high:**
 
-- High CRAP indicates complex code with poor test coverage
+- High complexity indicates code that is hard to understand and maintain
 - Options:
   1. **Refactor** - Break down complex function into smaller ones
   2. **Improve tests** - Add specific assertions to catch mutations
