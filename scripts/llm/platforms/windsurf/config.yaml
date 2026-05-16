@@ -59,12 +59,11 @@ structure:
 
       ### Core Concepts
 
-      - The **domain** is the heart of the application and must remain completely independent.
+      - The **domain** is the heart — completely independent of frameworks and infrastructure.
       - All dependencies point **inward** toward the domain.
-      - External concerns (databases, HTTP, third-party APIs, etc.) are pushed to the edges as adapters.
-      - The core business logic is decoupled from frameworks, databases, and delivery mechanisms.
+      - External concerns (DB, HTTP, APIs) live in `adapter/` at the edges.
 
-      ### Layer Responsibilities & Rules
+      ### Layer Responsibilities
 
       - **`core/domain/`** — Pure business entities, value objects, and domain rules.
         **Must have zero dependencies** on any other internal package.
@@ -113,16 +112,16 @@ structure:
       3. [Google Go Style Decisions](https://google.github.io/styleguide/go/decisions)
       4. [Google Go Best Practices](https://google.github.io/styleguide/go/best-practices)
 
-      ### Summary of Core Expectations
+      ### Core Expectations
 
-      - **Clarity & Simplicity**: Prioritize readability over cleverness. Choose the simplest solution.
-      - **Consistency**: Follow `gofmt`, `goimports`, and surrounding codebase style.
-      - **Naming & Comments**: `MixedCaps` for exported, `mixedCaps` for unexported. Exported identifiers need sentence comments.
-      - **Error Handling**: Always check errors, wrap with `%w`, use `errors.Is`/`errors.As`.
-      - **Interfaces**: Keep small and focused, named after behavior.
+      - **Clarity**: Choose the simplest solution. Prioritize readability.
+      - **Consistency**: `gofmt`, `goimports`, follow existing style.
+      - **Naming**: `MixedCaps` exported, `mixedCaps` unexported. Exported identifiers need sentence comments.
+      - **Errors**: Always check, wrap with `%w`, use `errors.Is`/`errors.As`.
+      - **Interfaces**: Small, focused, named after behavior.
       - **Testing**: Table-driven with `t.Run`, maintain 80%+ coverage.
-      - **Concurrency**: Use `context.Context` as first parameter when appropriate.
-      - **Architecture**: Maintain strict hexagonal boundaries, keep `core/domain/` pure.
+      - **Concurrency**: `context.Context` as first parameter where applicable.
+      - **Architecture**: Strict hexagonal boundaries, `core/domain/` pure.
 
       **Precedence**: Effective Go → Google Style Guide → Style Decisions → Best Practices
 
@@ -134,71 +133,53 @@ structure:
 
       ### Test Types
 
-      - **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
-      - **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
+      - **Unit tests** — `task test`. Test in isolation with mocks.
+      - **Integration tests** — `task integration`. Add `//go:build integration` tag. Test with real dependencies.
 
-      ### Test Guidelines
+      ### Guidelines
 
-      - **Prefer table-driven tests** for multiple test cases
-      - Use `t.Run` for subtests with descriptive names
-      - Test file naming: `mycode_test.go` in same package as `mycode.go`
-      - Exported test functions must start with `Test`
-      - Maintain test coverage above 80% (configurable via `COVERAGE_THRESHOLD`)
-
-      ### Running Tests
+      - Table-driven tests with `t.Run`
+      - Test files: `mycode_test.go` alongside `mycode.go`
+      - Coverage ≥80% (configurable via `COVERAGE_THRESHOLD`)
 
       ```bash
       task test                    # Unit tests
-      go test -race -count=1 ./...
       task integration             # Integration tests
-      go test -race -tags=integration ./...
       go test -coverprofile=coverage.out ./...  # With coverage
       ```
 
       ---
 
-      ## Go Conventions Validation
+      ## Go Conventions
 
-      Go conventions are enforced by golangci-lint linters including godox, gochecknoinits, noctx, and others. These checks validate adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See `.golangci.yml` for the full list of enabled linters.
+      Enforced by golangci-lint (godox, gochecknoinits, noctx, etc.). See `.golangci.yml` for full configuration.
 
       ---
 
       ## CI & Quality Checks
 
-      This project uses centralized scripts for all quality checks, ensuring consistency between local git hooks and CI pipelines.
-
-      ### Running CI Locally
+      Centralized scripts ensure consistency between local hooks and CI.
 
       ```bash
-      # Run full CI pipeline (same as GitHub Actions)
-      make ci
-      # or
-      ./scripts/ci/ci.sh
+      task ci   # Run full pipeline (same as GitHub Actions)
       ```
 
       ### Git Hooks
 
-      Git hooks run automatically on commits/push. All hook logic lives in `scripts/ci/` with thin wrappers in `.githooks/`:
-
-      - **pre-commit**: gofmt, goimports, golangci-lint, tests, hex-arch-guardrail, gosec, go-vet, secrets, license headers, file quality
-      - **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies
-      - **commit-msg**: conventional commits format, message length
-      - **pre-rebase**: protect main/master branches
-      - **prepare-commit-msg**: add branch name to commit message
+      - **pre-commit**: formatting, linting, tests, architecture guardrail, security scan
+      - **pre-push**: build, tests, coverage, dependency checks
+      - **commit-msg**: conventional commits validation
 
       ### Configuration
 
-      Environment variables control behavior:
-
       - `COVERAGE_THRESHOLD` — Default 80%
       - `GOLANGCI_LINT_TIMEOUT` — Default 2m (pre-commit), 5m (CI)
-      - `GO_TEST_FLAGS` — Default `-short` (pre-commit), `-race` (CI)
 
       ---
 
-      ## Leveraging Go Package Documentation
+      ## Package Documentation
 
-      Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
+      Use [pkg.go.dev](https://pkg.go.dev) for Go standard library and third-party package documentation.
 
   # === Rules ===
   - path: rules/core.md
@@ -227,9 +208,20 @@ structure:
     content: |
       # Go Best Practices
 
-      - Always run `gofmt -s` and `goimports`
-      - Wrap errors with `%w`
-      - Keep tests fast and focused
+      <checklist>
+      1. [ ] Code formatted with `gofmt -s` and `goimports`
+      2. [ ] Errors wrapped with `fmt.Errorf("...: %w", err)` — never `%v`
+      3. [ ] Tests fast, focused, and deterministic — no `time.Now()`, no global state
+      4. [ ] No magic numbers — use named constants
+      5. [ ] Functions ≤4 parameters where possible
+      6. [ ] `context.Context` is first parameter where applicable
+      7. [ ] Interfaces small and focused (1–3 methods ideally)
+      </checklist>
+
+      <examples>
+      <example>BAD: `return fmt.Errorf("failed: %v", err)` — %v loses error chain</example>
+      <example>GOOD: `return fmt.Errorf("repository find: %w", err)` — %w preserves chain</example>
+      </examples>
 
   # === Security Rules ===
   - path: rules/security.md
@@ -237,11 +229,20 @@ structure:
     content: |
       # Security Rules (Always Apply)
 
-      - Never hardcode credentials, API keys, or secrets
-      - Use `os.Getenv` or the secure config loader in `internal/config`
-      - Always wrap errors with `%w`
-      - Validate all user input
-      - Do not log sensitive data
+      <rules>
+      1. [ ] No hardcoded credentials, API keys, or secrets — use `os.Getenv` or secure config
+      2. [ ] All errors wrapped with `%w` to avoid leaking sensitive information
+      3. [ ] All user input validated before use
+      4. [ ] No sensitive data logged (passwords, tokens, PII)
+      5. [ ] Secrets loaded from environment or secure config only
+      </rules>
+
+      <examples>
+      <example>BAD: `apiKey := "sk-1234567890abcdef"` — hardcoded secret</example>
+      <example>GOOD: `apiKey := os.Getenv("API_KEY"); if apiKey == "" { return ErrMissingAPIKey }`</example>
+      <example>BAD: `log.Printf("User login failed: %v", err)` — may leak sensitive info</example>
+      <example>GOOD: `log.Printf("Authentication failed for user %s", userID)` — sanitized logging</example>
+      </examples>
 
   # === Agents ===
   - path: agents/architect.md
@@ -348,14 +349,23 @@ structure:
     content: |
       # Documentation Generator Agent
 
-      You are a documentation specialist. When reviewing or writing code:
-      - Ensure all exported functions have complete godoc comments
-      - Generate API documentation from code annotations
-      - Create architecture diagrams for complex systems
-      - Write clear README files for new packages
-      - Document configuration options and environment variables
-      - Maintain changelog entries for significant changes
-      - Ensure code examples are accurate and up-to-date
+      You are a documentation specialist. You ensure code is self-documenting through godoc and that architecture is communicated clearly.
+
+      <checklist>
+      1. [ ] All exported functions have complete godoc comments (starts with function name)
+      2. [ ] Package-level documentation explains purpose and usage
+      3. [ ] Complex algorithms have inline comments explaining "why", not "what"
+      4. [ ] README files exist for packages with public APIs
+      5. [ ] Configuration options documented with defaults and examples
+      6. [ ] Changelog entries for breaking or significant changes
+      7. [ ] Code examples in documentation are tested and accurate
+      8. [ ] No commented-out code — remove or explain with TODO
+      </checklist>
+
+      <examples>
+      <example>BAD: `// helper function` — does not explain purpose</example>
+      <example>GOOD: `// CalculateTotal computes the sum of all order items including tax.`</example>
+      </examples>
 
   - path: agents/test-coverage.md
     type: file
@@ -383,28 +393,45 @@ structure:
     content: |
       # Dependency Management Agent
 
-      You are a dependency management expert. When reviewing or writing code:
-      - Monitor dependencies for known security vulnerabilities
-      - Suggest updates to outdated packages
-      - Identify dependency conflicts and version mismatches
-      - Recommend alternative libraries with better maintenance
-      - Ensure go.mod and go.sum are properly committed
-      - Validate that dependencies are minimal and necessary
-      - Check for deprecated or unmaintained packages
+      You are a dependency management expert. You ensure dependencies are secure, minimal, and up-to-date.
+
+      <investigate_before_answering>
+      Check go.mod, go.sum, and vulnerability scan results before making dependency recommendations.
+      </investigate_before_answering>
+
+      <checklist>
+      1. [ ] No known CVEs — `govulncheck` passing
+      2. [ ] Dependencies are minimal and necessary
+      3. [ ] No deprecated or unmaintained packages
+      4. [ ] go.mod and go.sum properly committed and in sync
+      5. [ ] No indirect dependency cycles
+      6. [ ] Version constraints are explicit, not overly permissive
+      </checklist>
 
   - path: agents/error-handling.md
     type: file
     content: |
       # Error Handling Agent
 
-      You are an error handling expert. When reviewing or writing code:
-      - Ensure all errors are checked and not ignored
-      - Validate error wrapping with %w for context preservation
-      - Check that error messages are informative and actionable
-      - Recommend proper error logging strategies
-      - Ensure errors are returned early when possible
-      - Validate error types are appropriate for the domain
-      - Check for proper error propagation through the stack
+      You are an error handling expert. Errors in Go are values — ignoring them hides bugs. Unwrapped errors lose context.
+
+      <checklist>
+      1. [ ] All errors checked — never `_ = someFunc()`
+      2. [ ] Errors wrapped with `fmt.Errorf("...: %w", err)` — never `%v`
+      3. [ ] `errors.Is` / `errors.As` used for comparison — never string matching
+      4. [ ] Errors returned early (fail fast, avoid deeply nested success paths)
+      5. [ ] Domain errors are sentinel values (`var ErrNotFound = errors.New(...)`)
+      6. [ ] Exported error variables for callers to compare against
+      7. [ ] No error swallowing in goroutines
+      8. [ ] Error messages lowercase, no trailing punctuation (Go convention)
+      </checklist>
+
+      <examples>
+      <example>BAD: `result, _ := repo.Find(id)` — error silently discarded</example>
+      <example>BAD: `return fmt.Errorf("failed: %v", err)` — %v loses error chain</example>
+      <example>GOOD: `return fmt.Errorf("order service find: %w", err)` — %w preserves chain</example>
+      <example>GOOD: `if errors.Is(err, ErrNotFound) { ... }` — type-safe comparison</example>
+      </examples>
 
   # === Skills ===
   - path: skills/hexagonal-review/SKILL.md
