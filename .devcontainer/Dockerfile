@@ -27,11 +27,16 @@ RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/d
 RUN go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0 && \
     go install github.com/loov/goda@latest
 
+# Set GOPATH to user home for proper permissions
+ENV GOPATH="/home/vscode/go"
+ENV PATH="/home/vscode/go/bin:${PATH}"
+
+# Create Go directory structure in user home
+RUN mkdir -p /home/vscode/go/{bin,pkg,src} && \
+    chown -R vscode:vscode /home/vscode/go
+
 # Set working directory
 WORKDIR /workspace
 
 # Switch to vscode user
 USER vscode
-
-# Set PATH
-ENV PATH="/go/bin:${PATH}"
