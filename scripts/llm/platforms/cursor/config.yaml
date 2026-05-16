@@ -169,7 +169,7 @@ structure:
 
       ```bash
       # Run full CI pipeline (same as GitHub Actions)
-      maee ci
+      task ci
       # or
       ./scripts/ci/ci.sh
       ```

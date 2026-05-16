@@ -101,3 +101,15 @@ structure:
 
       ---
 
+      ## Modern Go Stack Tasks
+
+      This project includes modern Go development tooling:
+
+      - `task benchmark` — Run benchmark tests
+      - `task sbom` — Generate Software Bill of Materials (SBOM)
+      - `task pprof` — Run application with pprof profiling enabled
+      - `task fuzz` — Run fuzz tests for security-critical code
+      - `task mutation-test` — Full mutation testing with Gremlins
+      - `task mutation-test-dry` — Fast mutation dry-run (CI mode)
+
+      ---

@@ -134,8 +134,8 @@ structure:
 
       ### Test Types
 
-      - **Unit tests** — Run on commit/PR (`makk test`). Test logic in isolation with mocks.
-      - **Integration tests** — Run on push (`makk integration`). Add `//go:build integration` tag. Test with real dependencies.
+      - **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
+      - **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
 
       ### Test Guidelines
 
@@ -148,9 +148,9 @@ structure:
       ### Running Tests
 
       ```bash
-      maee test                    # Unit tests
+      task test                    # Unit tests
       go test -race -count=1 ./...
-      maee integration             # Integration tests
+      task integration             # Integration tests
       go test -race -tags=integration ./...
       go test -coverprofile=coverage.out ./...  # With coverage
       ```
@@ -171,7 +171,7 @@ structure:
 
       ```bash
       # Run full CI pipeline (same as GitHub Actions)
-      maee ci
+      task ci
       # or
       ./scripts/ci/ci.sh
       ```
