@@ -7,35 +7,29 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
 errors=0
 warnings=0
 
 die() {
-    echo -e "${RED}error:${NC} $*" >&2
+    echo "error: $*" >&2
     ((errors++))
 }
 
 warn() {
-    echo -e "${YELLOW}warning:${NC} $*" >&2
+    echo "warning: $*" >&2
     ((warnings++))
 }
 
 success() {
-    echo -e "${GREEN}success:${NC} $*"
+    echo "success: $*"
 }
 
-echo -e "${CYAN}> Enhanced Hexagonal Architecture Guardrail${NC}"
-echo -e "${CYAN}> Validating against docs/architecture/architecture.md${NC}"
+echo "> Enhanced Hexagonal Architecture Guardrail"
+echo "> Validating against docs/architecture/architecture.md"
 echo
 
 # 1. core/domain/ must remain pure
-echo -e "${CYAN}> Checking core/domain/ (should only depend on standard library and itself)${NC}"
+echo "> Checking core/domain/ (should only depend on standard library and itself)"
 if [ -d "internal/core/domain" ]; then
     # Use go list to check actual imports
     domain_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/core/domain/... 2>/dev/null || true)
@@ -48,7 +42,7 @@ fi
 echo
 
 # 2. core/services/ may depend on domain and ports, but not adapter
-echo -e "${CYAN}> Checking core/services/ dependencies${NC}"
+echo "> Checking core/services/ dependencies"
 if [ -d "internal/core/services" ]; then
     service_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/core/services/... 2>/dev/null || true)
     for pkg in $service_imports; do
@@ -60,7 +54,7 @@ fi
 echo
 
 # 3. core/ports/ should not depend on adapters or services
-echo -e "${CYAN}> Checking core/ports/ dependencies${NC}"
+echo "> Checking core/ports/ dependencies"
 if [ -d "internal/core/ports" ]; then
     port_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/core/ports/... 2>/dev/null || true)
     for pkg in $port_imports; do
@@ -72,7 +66,7 @@ fi
 echo
 
 # 4. Primary adapters should only depend on ports (primary) and domain
-echo -e "${CYAN}> Checking adapter/primary/${NC}"
+echo "> Checking adapter/primary/"
 if [ -d "internal/adapter/primary" ]; then
     primary_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/adapter/primary/... 2>/dev/null || true)
     for pkg in $primary_imports; do
@@ -84,7 +78,7 @@ fi
 echo
 
 # 5. Secondary adapters should depend on core/ports/secondary
-echo -e "${CYAN}> Checking adapter/secondary/${NC}"
+echo "> Checking adapter/secondary/"
 if [ -d "internal/adapter/secondary" ]; then
     secondary_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/adapter/secondary/... 2>/dev/null || true)
     for pkg in $secondary_imports; do
@@ -96,7 +90,7 @@ fi
 echo
 
 # 6. No framework leaks into core (core/domain, core/ports, core/services)
-echo -e "${CYAN}> Checking for framework leaks in core packages${NC}"
+echo "> Checking for framework leaks in core packages"
 framework_packages="github.com/gin github.com/gorilla database/sql github.com/lib/pq github.com/go-redis github.com/gorm"
 for dir in internal/core/domain internal/core/ports internal/core/services; do
     if [ -d "$dir" ]; then
@@ -113,7 +107,7 @@ done
 echo
 
 # 7. Port interfaces should not reference concrete adapter types
-echo -e "${CYAN}> Checking port interfaces for adapter references${NC}"
+echo "> Checking port interfaces for adapter references"
 if [ -d "internal/core/ports" ]; then
     port_imports=$(go list -f '{{.ImportPath}}: {{join .Imports " "}}' ./internal/core/ports/... 2>/dev/null || true)
     for pkg in $port_imports; do
@@ -125,7 +119,7 @@ fi
 echo
 
 # 8. Check for import cycles
-echo -e "${CYAN}> Checking for import cycles${NC}"
+echo "> Checking for import cycles"
 check_import_cycles() {
     local dir="$1"
     [[ -d "$dir" ]] || return 0
@@ -151,7 +145,7 @@ check_import_cycles "internal/adapter"
 echo
 
 # 9. Check cmd directory for business logic
-echo -e "${CYAN}> Checking cmd directory for business logic violations${NC}"
+echo "> Checking cmd directory for business logic violations"
 if [[ -d "cmd" ]]; then
     business_logic=$(find cmd -name "*.go" -exec grep -l -E "(func.*Business|func.*Validate|func.*Calculate)" {} \; 2>/dev/null || true)
     if [[ -n "$business_logic" ]]; then
@@ -163,13 +157,13 @@ fi
 # Summary
 echo
 if ((errors > 0)); then
-    echo -e "${RED}error:${NC} Hexagonal architecture guardrail FAILED with $errors error(s)"
+    echo "error: Hexagonal architecture guardrail FAILED with $errors error(s)"
     exit 1
 elif ((warnings > 0)); then
-    echo -e "${YELLOW}warning:${NC} Hexagonal architecture guardrail PASSED with $warnings warning(s)"
+    echo "warning: Hexagonal architecture guardrail PASSED with $warnings warning(s)"
     exit 0
 else
-    echo -e "${GREEN}success:${NC} Hexagonal architecture guardrail PASSED"
+    echo "success: Hexagonal architecture guardrail PASSED"
     echo "  - core/domain/ is pure (no internal imports)"
     echo "  - core/services/ only depends on core/domain/ and core/ports/"
     echo "  - core/ports/ does not depend on adapter/ or core/services/"

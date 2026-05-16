@@ -4,21 +4,19 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$ROOT"
 
 if ! command -v go >/dev/null 2>&1; then
-    echo -e "${RED}error:${NC} go not found"
+    echo "error: go not found"
     exit 1
 fi
 
-echo -e "${CYAN}> Running tests${NC}"
+echo "> Running tests"
 
 # Use GO_TEST_FLAGS env var or default to -short for pre-commit
-FLAGS=${GO_TEST_FLAGS:--short}
+GO_TEST_FLAGS="${GO_TEST_FLAGS:--short}"
 
-go test $FLAGS ./...
-echo -e "${GREEN}Tests: OK${NC}"
+go test $GO_TEST_FLAGS ./...
+echo "Tests: OK"
 echo

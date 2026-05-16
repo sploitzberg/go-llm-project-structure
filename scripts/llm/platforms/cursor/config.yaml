@@ -45,8 +45,6 @@ structure:
 
       ## Your Responsibilities as an Agent
 
-      - **Mosaic Retention Policy:** ALWAYS call `mosaic_hexxla_put_cell` for both `user_message` and `assistant_response` immediately after each exchange. Do not ask the user for permission to save conversation history. Include relevant topic-specific tags when calling put_cell.
-      - **ALWAYS consider using Mosaic tools in your decision making** - when retrieving context, searching for information, or persisting knowledge, use the Mosaic read/write patterns defined in `.cursor/rules/mosaic_mcp.mdc`.
       - Strictly adhere to architectural rules, coding standards, and best practices. Never cut corners.
       - Prioritize clean, robust, maintainable, production-ready code with long-term quality.
       - Security, testability, and separation of concerns are non-negotiable.
@@ -134,8 +132,8 @@ structure:
 
       ### Test Types
 
-      - **Unit tests** — Run on commit/PR (`make test`). Test logic in isolation with mocks.
-      - **Integration tests** — Run on push (`make integration`). Add `//go:build integration` tag. Test with real dependencies.
+      - **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
+      - **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
 
       ### Test Guidelines
 
@@ -148,9 +146,9 @@ structure:
       ### Running Tests
 
       ```bash
-      make test                    # Unit tests
+      task test                    # Unit tests
       go test -race -count=1 ./...
-      make integration             # Integration tests
+      task integration             # Integration tests
       go test -race -tags=integration ./...
       go test -coverprofile=coverage.out ./...  # With coverage
       ```
@@ -159,7 +157,7 @@ structure:
 
       ## Go Conventions Validation
 
-      The `scripts/ci/pre-commit/18-go-conventions.sh` script validates adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See the script for the full list of checks.
+      Go conventions are enforced by golangci-lint linters including godox, gochecknoinits, noctx, and others. These checks validate adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See `.golangci.yml` for the full list of enabled linters.
 
       ---
 
@@ -171,7 +169,7 @@ structure:
 
       ```bash
       # Run full CI pipeline (same as GitHub Actions)
-      make ci
+      maee ci
       # or
       ./scripts/ci/ci.sh
       ```
@@ -253,513 +251,107 @@ structure:
       - Follow `gosec` findings (enabled in CI)
       - Do not log sensitive data (passwords, tokens, PII)
 
-  # === Mosaic MCP Agent Rule ===
-  - path: rules/mosaic-mcp-agent.mdc
-    type: file
-    content: |
-      ---
-      description: Mosaic MCP — HexxlaDB tool chaining and retrieval workflow for AI assistants
-      alwaysApply: true
-      ---
-
-      # Mosaic MCP agent workflow
-
-      Applies when reasoning about **mosaic** MCP tools (`cmd/mosaic-mcp`) backed by HexxlaDB.
-
-      ## Getting the best results (read this first)
-
-      ### Retrieval: typical pipeline
-
-      1. **Pick entry points** — Use **`mosaic_hexxla_search_embedding`** when you need **semantic** "where on the lattice is this topic?" It returns **top‑K coords + text**, not full neighbourhoods.
-      2. **Or use structured query** — **`mosaic_hexxla_query_cells`** for tags, time, radius, filters, optional **`embed_query_text`** (hybrid ANN + predicates). **`mosaic_hexxla_search_cells`** for **lexical** substring relevance (optional hybrid via **`embed_query_text`**).
-      3. **Expand locally** — Take **1–3** `{q,r}` from those hits as **`seeds`** and call **`mosaic_hexxla_load_context_pack`** with a **modest** budget first (`max_ring`, `budget_tokens_approx` or `max_budget_bytes`). Increase rings/budget only if the answer is still incomplete.
-      4. **Do not** stop at embedding hits alone when the user needs **adjacent** evidence, **seams**, or **supersession** — that is what the context pack is for.
-
-      **Why this order:** Embedding finds **similar** cells globally; the context pack walks the **hex neighbourhood** from **known seeds** under a byte budget. Reversing (huge pack first) wastes tokens; skipping the pack leaves seams and neighbours invisible.
-
-      ### Lexical vs semantic (avoid false "empty DB")
-
-      | Goal | Tool |
-      | ---- | ---- |
-      | Phrase appears **literally** in stored text | **`mosaic_hexxla_search_cells`** |
-      | **Meaning** match, synonyms, "like this topic" | **`mosaic_hexxla_search_embedding`** |
-      | **Filters** + optional ANN | **`mosaic_hexxla_query_cells`** (+ **`embed_query_text`** when configured) |
-
-      **Empty lexical hits are normal** if the exact phrase was never written; try **embedding** or broaden **`query`**. **Empty embedding** may mean no vectors or unrelated corpus — use **`mosaic_hexxla_health`** and tag browse to sanity‑check.
-
-      ### User preferences and tagged slices
-
-      - To load **preference‑style** cells, prefer **`mosaic_hexxla_query_cells`** with **`require_tags`** including **`preference`** (and `sort_by`, `max_results`) instead of a vague full‑text query alone.
-      - **`mosaic_hexxla_list_tags`** / **`mosaic_hexxla_tag_counts`** help you **discover** taxonomy before searching or writing.
-
-      ### Writes: taxonomy before `put_cell`
-
-      1. Call **`mosaic_hexxla_list_tags`** (and often **`mosaic_hexxla_tag_counts`**) **before** **`mosaic_hexxla_put_cell`** when the DB taxonomy is unknown or you might invent a near‑duplicate tag.
-      2. **Reuse** existing tags when they fit; only add new tags when nothing matches — keeps retrieval and reports consistent.
-      3. Align **`source_id`** and **`kind`** with your persistence story (see persistence policy / config).
-
-      ### Turn persistence (when policy is "store every exchange")
-
-      Mosaic **never** auto‑saves chat — persistence is **only** via explicit **`mosaic_hexxla_put_cell`** (and related tools). When your operator/product policy requires a **full transcript** of user and assistant turns, align YAML **`retention.capture_mode`** with that intent (see **`save_all_turns`** in [`docs/mosaic/PERSISTENCE_POLICY.md`](docs/mosaic/PERSISTENCE_POLICY.md)) and call **`mosaic_hexxla_get_persistence_policy`** if unsure what the server allows.
-
-      **Mandatory sequence for that policy (one exchange = two writes):**
-
-      1. **Receive** the user message (and any session / correlation ids your stack uses).
-      2. **First persistence action** — **`mosaic_hexxla_put_cell`** with **`kind=user_message`**, **`raw_content`** = user text, stable **`source_id`** (e.g. session id), chosen **`(q,r)`** per project convention, tags as policy requires (reuse taxonomy via **`list_tags`** when needed).
-      3. **Reason, retrieve, and generate** the assistant reply (retrieval pipeline above still applies).
-      4. **Last persistence action before closing the turn** — **`mosaic_hexxla_put_cell`** with **`kind=assistant_response`**, same **`source_id`**, assistant text in **`raw_content`**, appropriate **`(q,r)`** / tags.
-
-      Skipping step 2 or 4 when **`save_all_turns`** (or explicit "persist everything" policy) is in effect is a **policy failure**. If **`capture_mode`** is **`llm_curates`**, storage is **discretionary** — this subsection is **not** a mandate unless humans/operators override.
-
-      **Editor note:** Cursor has **no** built‑in cross‑session Memories as of Cursor 3.0; durable context belongs in **your** store (e.g. Mosaic via MCP). Background: [Cursor 3.0 and external memory](https://omegamax.co/blog/cursor-removed-memories).
-
-  - path: rules/mosaic_intelligent_reads.md
-    type: file
-    content: |
-      ---
-      description: Mosaic intelligent read patterns - choosing the right search tool and loading context
-      trigger: always_on
-      ---
-
-      # Mosaic Intelligent Read Patterns
-
-      **Tool selection:**
-
-      - **Semantic search** - `mosaic_hexxla_search_embedding` for concept discovery (embeddings required)
-      - **Structured query** - `mosaic_hexxla_query_cells` with tags/filters/time/spatial for precise retrieval
-      - **Lexical search** - `mosaic_hexxla_search_cells` for exact text/keyword matching
-
-      **Hybrid mode:** Set `embed_query_text` in query_cells or search_cells to combine ANN with filters/lexical.
-
-      **Context loading:**
-
-      After retrieval, check `retrieval_hint` field. If present, call `mosaic_hexxla_load_context_pack` with:
-
-      - `seeds`: Array of `{q, r}` from hits (1-3 seeds)
-      - `budget_tokens_approx`: Approximate LM tokens (default 4096)
-      - `max_ring`: Hex rings from seeds (default 3)
-      - `include_seams`: Include contradictions (default false)
-      - `filter_superseded`: Exclude stale content (default false)
-
-      **Budget estimation:** `mosaic_hexxla_estimate_context_budget_bytes` before loading.
-
-      **Patterns:**
-
-      - Preferences: `query_cells(require_tags=["preference"], sort_by="recency")`
-      - Concept discovery: `search_embedding(query="natural language")`
-      - Text lookup: `search_cells(query="exact phrase")`
-
-      **Anti-patterns:**
-
-      - ❌ Using search_embedding when you know exact tags (use query_cells)
-      - ❌ Using query_cells without filters (too broad)
-      - ❌ Loading context without seeds from prior search
-      - ❌ Ignoring retrieval_hint in responses
-
-  - path: rules/mosaic_intelligent_writes.md
-    type: file
-    content: |
-      ---
-      description: Mosaic intelligent write patterns - tag discovery and reuse before put_cell
-      trigger: always_on
-      ---
-
-      # Mosaic Intelligent Write Patterns
-
-      **Before put_cell, always:**
-
-      1. **List tags** - `mosaic_hexxla_list_tags` + `mosaic_hexxla_tag_counts` to see vocabulary
-      2. **Search** - `mosaic_hexxla_query_cells` / `mosaic_hexxla_search_cells` / `mosaic_hexxla_search_embedding` for existing content
-      3. **Load context** - `mosaic_hexxla_load_context_pack` with seeds from hits
-      4. **Decide:**
-         - Exact match? Reuse
-         - Similar but outdated? Mark superseded, create new
-         - No relevant content? Create with existing tags
-         - New concept? Create with minimal new tags
-
-      **Tag rules:**
-
-      - Prefer high-frequency tags from `tag_counts`
-      - Use atomic tags, not compound (e.g., `["coordinate", "system"]` not `["coordinate_system"]`)
-      - Only create new tags if concept is fundamentally different and will be reused
-      - See `.cursor/rules/mosaic_tag_conventions.md` for detailed tagging guidelines
-
-      **Anti-patterns:**
-
-      - ❌ Creating cells without searching
-      - ❌ Inventing tags without checking `list_tags`
-      - ❌ Using generic tags when specific exist
-      - ❌ Creating duplicates instead of reusing
-
-  - path: rules/mosaic_tag_conventions.md
-    type: file
-    content: |
-      ---
-      description: Mosaic tag conventions for optimal retrieval - best practices for tagging cells
-      trigger: always_on
-      ---
-
-      # Mosaic Tag Conventions
-
-      **Principles:**
-
-      - Specific over generic
-      - Reuse existing tags (check `mosaic_hexxla_list_tags` first)
-      - Compose, don't compound (use `["coordinate", "system"]` not `["coordinate_system"]`)
-      - Think about retrieval: how will you search for this later?
-      - Consistent lowercase casing
-      - 3-7 tags typical, minimal but sufficient
-
-      **Tag categories:**
-
-      **Content quality:** fact, opinion, idea, noise, signal, important, preference, question, answer, note, example
-
-      **Domain:** api, algorithm, database, ui, backend, frontend, devops, security, performance, testing
-
-      **Technology:** go, python, javascript, typescript, rust, sql, http, json, yaml, xml
-
-      **Concept:** coordinate, conversion, pathfinding, caching, authentication, encryption, compression, indexing, query, transaction
-
-      **Lifecycle:** draft, review, approved, deprecated, archived, wip, final
-
-      **Tagging patterns:**
-
-      - Fact: `[content_quality, domain, technology, concept]`
-      - Preference: `["preference", category, subcategory]`
-      - Question: `["question", domain, concept]`
-      - Answer: Match question tags + "answer"
-
-      **Anti-patterns:**
-
-      - ❌ Over-tagging (10+ tags)
-      - ❌ Under-tagging (1-2 generic tags)
-      - ❌ Compound tags (`["coordinate_conversion"]`)
-      - ❌ Inconsistent casing
-      - ❌ One-off tags that won't be reused
-
-      **Before put_cell:**
-
-      1. `mosaic_hexxla_list_tags()` - see available vocabulary
-      2. `mosaic_hexxla_tag_counts()` - prefer high-frequency tags
-      3. Only create new tag if concept is fundamentally different
-
-  - path: rules/mosaic_mcp.mdc
-    type: file
-    content: |
-      ---
-      description: Mosaic MCP — HexxlaDB tool chaining and retrieval workflow for AI assistants
-      alwaysApply: true
-      ---
-
-      # Mosaic MCP agent workflow
-
-      Applies when reasoning about **mosaic** MCP tools (`cmd/mosaic-mcp`) backed by HexxlaDB.
-
-      ## ALWAYS DO
-
-      Adhere to the retention policy STRICTLY!, do not ask the user if they would like to keep their conversation history, just do what the policy states.
-
-      ## Tool roles (short)
-
-      | Tool                              | Role                                                                                                   |
-      | --------------------------------- | ------------------------------------------------------------------------------------------------------ |
-      | `mosaic_hexxla_health`            | DB integrity / layout / embedding options                                                              |
-      | `mosaic_hexxla_search_embedding`  | **Semantic** top‑K (ANN) — entry points, not full neighbourhoods                                       |
-      | `mosaic_hexxla_query_cells`       | **Structured** indexed query (tags, time, radius, sort, explain)                                       |
-      | `mosaic_hexxla_search_cells`      | **Lexical** relevance search                                                                           |
-      | `mosaic_hexxla_load_context_pack` | **Lattice-expanded** context from **seed coords** (rings + byte budget; optional seams / supersession) |
-
-      ## Chaining (default expectation)
-
-      1. **Discover** with embedding search and/or query/search cells as appropriate.
-      2. Read **`retrieval_hint`** on embedding or cell-hit responses when present.
-      3. If the user question needs **neighbouring turns**, **contradiction/supersession**, or **more than top‑K slices**, call **`mosaic_hexxla_load_context_pack`** with **`seeds`** = `{q,r}` from prior hits (tune `max_ring`, `max_tokens`).
-      4. Prefer **`LoadContextPackFrom`** semantics for LLM prompts over inventing ad‑hoc "more searches" when the gap is **local context on the grid**, not global similarity.
-
-      ## Primitive note
-
-      `Tx.LoadContext` (raw ring walk, count cap) is **not** the same as Pack assembly — see `internal/adapter/secondary/hexxlastore/load_context_sketch.go`. Do not assume Mosaic exposes it unless a dedicated tool is added.
-
-      ## Security / deployment
-
-      - MCP is intended **localhost-only**; respect existing [`security.mdc`](security.mdc) (no secrets in logs, env-based config).
-      - Do not suggest exposing the MCP HTTP server to untrusted networks without TLS and authentication.
-
-      ## References
-
-      - [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for agents
-      - [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in the development workflow
-
-  # === Subagents ===
-  - path: agents/architect.md
-    type: file
-    content: |
-      ---
-      name: architect
-      description: Expert in Hexagonal Architecture design
-      ---
-
-      You are a staff-level Go engineer specialising in Hexagonal Architecture and domain-driven design. Your role is to enforce clean separation of concerns and correct dependency direction. You are critical and direct — surface architectural issues clearly rather than softening findings.
-
-      <investigate_before_answering>
-      Never speculate about code you have not read. Always open and read relevant files before making architectural assessments.
-      </investigate_before_answering>
-
-      <architecture_checklist>
-      When reviewing or designing code, verify:
-      1. [ ] `core/domain/` has zero imports from other internal packages
-      2. [ ] `core/services/` only imports `core/domain/` and `core/ports/`
-      3. [ ] No adapter packages imported in any core layer
-      4. [ ] Port interfaces are defined in `core/ports/`, not in adapters
-      5. [ ] Adapters implement port interfaces — not the other way around
-      6. [ ] No business logic leaking into adapter layer
-      7. [ ] Domain objects are not HTTP/DB framework types
-      8. [ ] All external I/O goes through a port interface
-      </architecture_checklist>
-
-  - path: agents/reviewer.md
-    type: file
-    content: |
-      ---
-      name: reviewer
-      description: Strict architecture and code quality reviewer
-      ---
-
-      You are a senior Go engineer performing thorough code reviews. You focus on correctness, architecture compliance, idiomatic Go, and security. You are critical and direct — report all findings with file, line, and suggested fix.
-
-      <investigate_before_answering>
-      Read all referenced files before forming conclusions. Never report speculative issues.
-      </investigate_before_answering>
-
-      <review_checklist>
-      1. [ ] No adapter imports in `core/domain/` or `core/ports/`
-      2. [ ] Functions have ≤4 parameters
-      3. [ ] All errors checked and wrapped with `%w`
-      4. [ ] No magic numbers — named constants used
-      5. [ ] No `panic()` in production code
-      6. [ ] No `init()` functions
-      7. [ ] `context.Context` is first parameter where applicable
-      8. [ ] Interfaces are small and focused (1–3 methods)
-      9. [ ] No hardcoded secrets or credentials
-      10. [ ] Tests assert specific behaviour, not just execution
-      </review_checklist>
-
-      For each failure: quote the offending line, state the rule, and suggest the fix.
-
-  - path: agents/security.md
-    type: file
-    content: |
-      ---
-      name: security
-      description: Security specialist focused on secure coding practices
-      ---
-
-      You are a security engineer with expertise in Go application security and OWASP Top 10. Every finding includes: file, line, vulnerability class, and specific remediation. Do not report speculative issues — only findings backed by evidence in the code.
-
-      <investigate_before_answering>
-      Read the actual code before making security claims. Never assume a vulnerability without evidence.
-      </investigate_before_answering>
-
-      <security_checklist>
-      1. [ ] No hardcoded secrets, API keys, or credentials
-      2. [ ] Secrets loaded from environment or secure config only
-      3. [ ] All user input validated and sanitised
-      4. [ ] Errors do not expose internal paths or stack traces
-      5. [ ] SQL queries parameterised — no string concatenation
-      6. [ ] Authentication tokens validated on every protected endpoint
-      7. [ ] `govulncheck` passing — no known CVEs
-      8. [ ] No sensitive data logged (passwords, tokens, PII)
-      9. [ ] HTTP handlers validate content-type and enforce limits
-      10. [ ] CSRF protection on state-changing endpoints
-      </security_checklist>
-
-  - path: agents/performance.md
-    type: file
-    content: |
-      ---
-      name: performance
-      description: Performance optimization expert
-      ---
-
-      You are a Go performance engineer. You identify real, measurable performance problems backed by evidence — not speculative optimisations. Profile before optimising; prefer algorithmic improvements over micro-optimisations.
-
-      <investigate_before_answering>
-      Profile or benchmark before claiming a performance problem. Read the actual code paths before recommending changes.
-      </investigate_before_answering>
-
-      <performance_checklist>
-      1. [ ] No N+1 query patterns — use batching or joins
-      2. [ ] Database queries indexed on filtered/sorted columns
-      3. [ ] No unnecessary allocations in hot paths
-      4. [ ] Goroutines bounded — no unbounded spawning
-      5. [ ] HTTP clients and DB connections use pooling
-      6. [ ] Large structs passed by pointer, not value
-      7. [ ] Caching for expensive, frequently-read data
-      8. [ ] Context cancellation propagated to cancel in-flight work
-      9. [ ] Benchmarks exist for critical paths (`go test -bench`)
-      </performance_checklist>
-
-  - path: agents/documentation.md
-    type: file
-    content: |
-      ---
-      name: documentation
-      description: Documentation specialist
-      ---
-
-      You are a documentation specialist. When reviewing or writing code:
-      - Ensure all exported functions have complete godoc comments
-      - Generate API documentation from code annotations
-      - Create architecture diagrams for complex systems
-      - Write clear README files for new packages
-      - Document configuration options and environment variables
-      - Maintain changelog entries for significant changes
-      - Ensure code examples are accurate and up-to-date
-
-  - path: agents/test-coverage.md
-    type: file
-    content: |
-      ---
-      name: test-coverage
-      description: Testing expert focused on coverage and quality
-      ---
-
-      You are a Go testing expert focused on semantic test quality — not just coverage numbers. A test that executes code without asserting behaviour is worthless. You write tests that catch real bugs and survive mutation testing.
-
-      <test_quality_checklist>
-      1. [ ] Tests assert specific output values — not just `err == nil`
-      2. [ ] Table-driven tests for multiple scenarios (`t.Run`)
-      3. [ ] Edge cases: empty/nil input, zero values, boundary conditions
-      4. [ ] Error paths tested explicitly
-      5. [ ] Tests deterministic — no `time.Now()`, no global state
-      6. [ ] Mocks implement port interfaces, not concrete types
-      7. [ ] Integration tests tagged `//go:build integration`
-      8. [ ] Coverage ≥80% on domain and services layers
-      9. [ ] Test file naming: `foo_test.go` alongside `foo.go`
-      </test_quality_checklist>
-
-  - path: agents/dependency.md
-    type: file
-    content: |
-      ---
-      name: dependency
-      description: Dependency management expert
-      ---
-
-      You are a dependency management expert. When reviewing or writing code:
-      - Monitor dependencies for known security vulnerabilities
-      - Suggest updates to outdated packages
-      - Identify dependency conflicts and version mismatches
-      - Recommend alternative libraries with better maintenance
-      - Ensure go.mod and go.sum are properly committed
-      - Validate that dependencies are minimal and necessary
-      - Check for deprecated or unmaintained packages
-
-  - path: agents/error-handling.md
-    type: file
-    content: |
-      ---
-      name: error-handling
-      description: Error handling expert
-      ---
-
-      You are an error handling expert. When reviewing or writing code:
-      - Ensure all errors are checked and not ignored
-      - Validate error wrapping with %w for context preservation
-      - Check that error messages are informative and actionable
-      - Recommend proper error logging strategies
-      - Ensure errors are returned early when possible
-      - Validate error types are appropriate for the domain
-      - Check for proper error propagation through the stack
-
-  # === Mosaic MCP Configuration ===
-  - path: mcp.json
-    type: file
-    content: |
-      {
-        "mcpServers": {
-          "mosaic": {
-            "url": "http://127.0.0.1:8787/mcp"
-          }
-        }
-      }
-
-  # === Hooks ===
+  # === Hooks (Cursor Hooks) ===
   - path: hooks.json
     type: file
     content: |
       {
-        "version": 1,
         "hooks": {
           "beforeReadFile": [
             {
-              "command": ".cursor/hooks/pre-read.sh",
-              "description": "Inject architecture and mosaic context before reading files"
-            }
-          ],
-          "afterReadFile": [
-            {
-              "command": ".cursor/hooks/post-read-code.sh",
-              "description": "Track file access patterns"
+              "command": ".cursor/hooks/before-read-file.sh",
+              "matcher": {
+                "file_pattern": "*.go"
+              }
             }
           ],
           "beforeFileEdit": [
             {
-              "command": ".cursor/hooks/pre-write.sh",
-              "description": "Validate before file writes, block protected files"
+              "command": ".cursor/hooks/before-file-edit.sh",
+              "matcher": {
+                "file_pattern": "*.go"
+              }
             }
           ],
           "afterFileEdit": [
             {
-              "command": ".cursor/hooks/post-write-code.sh",
-              "description": "Auto-format and validate Go files after edit"
+              "command": ".cursor/hooks/after-file-edit.sh",
+              "matcher": {
+                "file_pattern": "*.go"
+              }
             }
           ],
-          "beforeCommandExecution": [
+          "beforeShellExecution": [
             {
-              "command": ".cursor/hooks/pre-run-command.sh",
-              "description": "Block dangerous commands"
+              "command": ".cursor/hooks/before-shell-execution.sh"
             }
           ],
-          "afterCommandExecution": [
+          "afterShellExecution": [
             {
-              "command": ".cursor/hooks/post-run-command.sh",
-              "description": "Log command execution"
+              "command": ".cursor/hooks/after-shell-execution.sh"
             }
           ],
           "beforeMCPExecution": [
             {
-              "command": ".cursor/hooks/pre-mcp-execution.sh",
-              "description": "Provide mosaic MCP tool guidance"
+              "command": ".cursor/hooks/before-mcp-execution.sh"
             }
           ],
           "afterMCPExecution": [
             {
-              "command": ".cursor/hooks/post-mcp-execution.sh",
-              "description": "Track Mosaic operations"
+              "command": ".cursor/hooks/after-mcp-execution.sh"
             }
           ],
           "beforeSubmitPrompt": [
             {
-              "command": ".cursor/hooks/pre-submit-prompt.sh",
-              "description": "Inject mosaic context before agent reasoning"
+              "command": ".cursor/hooks/before-submit-prompt.sh"
+            }
+          ],
+          "afterAgentResponse": [
+            {
+              "command": ".cursor/hooks/after-agent-response.sh"
+            }
+          ],
+          "afterAgentThought": [
+            {
+              "command": ".cursor/hooks/after-agent-thought.sh"
+            }
+          ],
+          "subagentStart": [
+            {
+              "command": ".cursor/hooks/subagent-start.sh"
+            }
+          ],
+          "subagentStop": [
+            {
+              "command": ".cursor/hooks/subagent-stop.sh"
             }
           ],
           "sessionStart": [
             {
-              "command": ".cursor/hooks/session-start.sh",
-              "description": "Inject mosaic context at session start"
+              "command": ".cursor/hooks/session-start.sh"
+            }
+          ],
+          "sessionEnd": [
+            {
+              "command": ".cursor/hooks/session-end.sh"
+            }
+          ],
+          "workspaceOpen": [
+            {
+              "command": ".cursor/hooks/workspace-open.sh"
             }
           ]
         }
       }
 
-  - path: hooks/post-write-code.sh
+  - path: hooks/before-read-file.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor post-write-code hook for Go files
-      # Targeted post-write actions for individual files
+      # Cursor before-read-file hook
+      # Injects architecture context before LLM reads code
+
+      set -euo pipefail
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
@@ -767,160 +359,102 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      # Parse file path from cursor input
-      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ "$file_path" == *.go ]]; then
-        # Format Go files
-        gofmt -l -s -w "$file_path" 2>/dev/null || true
-        goimports -l -w "$file_path" 2>/dev/null || true
-
-        # Run go vet on the specific package
-        pkg_dir=$(dirname "$file_path")
-        go vet "$pkg_dir" 2>/dev/null || true
-
-        # Run architecture guardrail on the specific file
-        ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
-
-        # Run Go conventions check on the specific file
-        ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
-      fi
-
-      # Return success
-      echo '{"continue": true, "permission": "allow"}'
-
-      exit 0
-
-  - path: hooks/post-write.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor post-write hook for Go files (legacy, kept for compatibility)
-      # Receives JSON input via stdin
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse file path from cursor input
-      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ "$file_path" == *.go ]]; then
-        # Format Go files
-        gofmt -l -s -w "$file_path" 2>/dev/null || true
-        goimports -l -w "$file_path" 2>/dev/null || true
-
-        # Run fast quality checks
-        go vet ./... 2>/dev/null || true
-        ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
-        ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
-
-        # Run LLM-specific hooks
-        if [ -f "scripts/llm/hooks/post-write-test-suggestion.sh" ]; then
-          ./scripts/llm/hooks/post-write-test-suggestion.sh "{\"file_path\": \"$file_path\"}" 2>/dev/null || true
-        fi
-
-        if [ -f "scripts/llm/hooks/post-write-doc-reminder.sh" ]; then
-          ./scripts/llm/hooks/post-write-doc-reminder.sh "{\"file_path\": \"$file_path\"}" 2>/dev/null || true
-        fi
-      fi
-
-      # Return success
-      echo '{"continue": true, "permission": "allow"}'
-
-      exit 0
-
-  - path: hooks/post-read-code.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor post-read-code hook
-      # Tracks file access patterns
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse file path from cursor input
-      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$file_path" ]]; then
-        echo "📖 File read: $file_path" >&2
-
-        # Track which layers are being accessed
-        if [[ "$file_path" == internal/core/domain/* ]]; then
-          echo "  Layer: core/domain" >&2
-        elif [[ "$file_path" == internal/core/ports/* ]]; then
-          echo "  Layer: core/ports" >&2
-        elif [[ "$file_path" == internal/core/services/* ]]; then
-          echo "  Layer: core/services" >&2
-        elif [[ "$file_path" == internal/adapter/primary/* ]]; then
-          echo "  Layer: adapter/primary" >&2
-        elif [[ "$file_path" == internal/adapter/secondary/* ]]; then
-          echo "  Layer: adapter/secondary" >&2
-        fi
-      fi
-
-      echo '{"continue": true, "permission": "allow"}'
-      exit 0
-
-  - path: hooks/pre-write.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor pre-write hook
-      # Validates code before it's written to disk
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse file path from cursor input
+      # Parse file path from input
       file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
 
       if [[ -z "$file_path" ]]; then
-        echo '{"continue": true, "permission": "allow"}'
+        exit 0
+      fi
+
+      # Run context injection
+      if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
+        ./scripts/llm/hooks/pre-read-context-injection.sh "$file_path" 2>/dev/null || true
+      fi
+
+      # Run layer awareness
+      if [ -f "scripts/llm/hooks/pre-read-layer-awareness.sh" ]; then
+        ./scripts/llm/hooks/pre-read-layer-awareness.sh "$file_path" 2>/dev/null || true
+      fi
+
+      exit 0
+
+  - path: hooks/before-file-edit.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor before-file-edit hook
+      # Pre-write validation hook (parity with Windsurf pre_write_code)
+      # Runs fast blocking linters before code is written
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse file path from input
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$file_path" ]]; then
         exit 0
       fi
 
       # Check if file is a Go file
       if [[ "$file_path" != *.go ]]; then
-        echo '{"continue": true, "permission": "allow"}'
         exit 0
       fi
 
       # Block writes to protected files
-      protected_files=("go.mod" "go.sum" ".golangci.yml" "Makefile")
+      protected_files=(
+        "go.mod"
+        "go.sum"
+        ".golangci.yml"
+        "Taskfile"
+      )
 
       for protected in "${protected_files[@]}"; do
         if [[ "$(basename "$file_path")" == "$protected" ]]; then
-          echo "⚠️  Protected file: $file_path" >&2
-          echo "This file should not be modified directly." >&2
-          echo '{"continue": false, "permission": "deny", "reason": "Protected file"}'
-          exit 0
+          echo "error: Protected file: $file_path"
+          echo "This file should not be modified directly."
+          echo "Use 'go mod tidy' for go.mod/go.sum instead."
+          exit 2
         fi
       done
 
       # Check if file is in core/domain/ and would violate purity
       if [[ "$file_path" == internal/core/domain/* ]]; then
-        echo "ℹ️  Writing to core/domain/ - ensure no internal dependencies" >&2
+        echo "info: Writing to core/domain/ - ensure no internal dependencies"
       fi
 
-      echo '{"continue": true, "permission": "allow"}'
+      # Run pre-write architecture compliance check
+      if [ -f "scripts/llm/hooks/pre-write-arch-compliance.sh" ]; then
+        ./scripts/llm/hooks/pre-write-arch-compliance.sh "$input" 2>/dev/null || true
+      fi
+
+      # Run fast blocking linters before write (depguard, gosec, errcheck)
+      # These checks can block the write if violations are found
+      golangci-lint run --disable-all --enable=depguard,gosec,errcheck --out-format=colored-line-number "$file_path" 2>&1 | head -20
+      lint_exit=$?
+
+      if [[ $lint_exit -ne 0 ]]; then
+        echo "error: Pre-write linter checks failed. See output above."
+        echo "Fix the issues before proceeding."
+        exit 2
+      fi
+
       exit 0
 
-  - path: hooks/pre-run-command.sh
+  - path: hooks/after-file-edit.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor pre-run-command hook
-      # Blocks dangerous commands before execution
+      # Cursor after-file-edit hook
+      # Formats Go files and runs quality checks after edits
+      # Disables expensive linters (complexity) to keep LLM fast
+
+      set -euo pipefail
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
@@ -928,95 +462,95 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      # Parse command line from cursor input
-      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+      # Parse file path from input
+      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
 
-      if [[ -z "$command_line" ]]; then
-        echo '{"continue": true, "permission": "allow"}'
+      if [[ -z "$file_path" ]] || [[ "$file_path" != *.go ]]; then
+        exit 0
+      fi
+
+      # Format Go files using golangci-lint formatters
+      # Disable expensive linters (complexity, duplication) for fast LLM iteration
+      golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
+
+      # Run fast quality checks
+      go vet "$file_path" 2>/dev/null || true
+
+      # Run architecture guardrail on the specific file
+      ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
+
+      # Run LLM-specific hooks
+      if [ -f "scripts/llm/hooks/post-write-test-suggestion.sh" ]; then
+        ./scripts/llm/hooks/post-write-test-suggestion.sh "$file_path" 2>/dev/null || true
+      fi
+
+      if [ -f "scripts/llm/hooks/post-write-doc-reminder.sh" ]; then
+        ./scripts/llm/hooks/post-write-doc-reminder.sh "$file_path" 2>/dev/null || true
+      fi
+
+      exit 0
+
+  - path: hooks/before-shell-execution.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor before-shell-execution hook
+      # Blocks dangerous commands before execution
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse command from input
+      command=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$command" ]]; then
         exit 0
       fi
 
       # List of dangerous commands to block
-      dangerous_patterns=("rm -rf /" "rm -rf /home" "rm -rf /usr" "rm -rf /etc" "rm -rf /var" "dd if=" ":(){:|:&};:" "> /dev/sd" "mkfs." "git push --force" "git push -f" "chmod -R 777 /" "chown -R")
+      dangerous_commands=(
+        "rm -rf /"
+        "dd if="
+        "mkfs"
+        ":(){:|:&};:"
+        "chmod -R 777"
+        "chown -R"
+        "curl | sh"
+        "wget | sh"
+        "> /dev/sd"
+        "> /dev/hd"
+      )
 
-      # Check if command matches any dangerous pattern
-      for pattern in "${dangerous_patterns[@]}"; do
-        if [[ "$command_line" == *"$pattern"* ]]; then
-          echo "⛔  Blocked dangerous command: $command_line" >&2
-          echo '{"continue": false, "permission": "deny", "reason": "Dangerous command"}'
-          exit 0
+      # Check if command contains dangerous patterns
+      for dangerous in "${dangerous_commands[@]}"; do
+        if [[ "$command" == *"$dangerous"* ]]; then
+          echo "error: Dangerous command blocked: $command" >&2
+          exit 2
         fi
       done
 
-      # Warn about potentially destructive commands
-      warning_patterns=("rm -rf" "git push" "docker rm" "kubectl delete")
-
-      for pattern in "${warning_patterns[@]}"; do
-        if [[ "$command_line" == *"$pattern"* ]]; then
-          echo "⚠️  Warning: Potentially destructive command: $command_line" >&2
+      # Block writes to protected files
+      protected_files=("go.mod" "go.sum" ".golangci.yml" "Taskfile")
+      for protected in "${protected_files[@]}"; do
+        if [[ "$command" == *"$protected"* ]] && [[ "$command" == *"rm"* ]] || [[ "$command" == *"mv"* ]]; then
+          echo "error: Protected file modification blocked: $protected" >&2
+          exit 2
         fi
       done
 
-      echo '{"continue": true, "permission": "allow"}'
       exit 0
 
-  - path: hooks/post-run-command.sh
+  - path: hooks/after-shell-execution.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Cursor post-run-command hook
-      # Logs command execution results
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse command line from cursor input
-      command_line=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$command_line" ]]; then
-        echo "🚀 Command executed: $command_line" >&2
-      fi
-
-      echo '{"continue": true, "permission": "allow"}'
-      exit 0
-
-  - path: hooks/post-mcp-execution.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor post-mcp-execution hook
-      # Logs Mosaic MCP tool usage
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Read JSON input from stdin
-      input=$(cat)
-
-      # Parse MCP tool info
-      mcp_server_name=$(echo "$input" | jq -r '.server_name // empty' 2>/dev/null || echo "")
-      mcp_tool_name=$(echo "$input" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
-
-      if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
-        echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
-
-        if [[ "$mcp_server_name" == "mosaic" ]]; then
-          echo "🧩 Mosaic Tool: $mcp_tool_name" >&2
-        fi
-      fi
-
-      echo '{"continue": true, "permission": "allow"}'
-      exit 0
-
-  - path: hooks/pre-read.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor pre-read hook
-      # Injects architecture and mosaic context before reading files
+      # Cursor after-shell-execution hook
+      # Logs command execution results for audit trail
 
       set -euo pipefail
 
@@ -1026,154 +560,27 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      # Parse file path from cursor input
-      file_path=$(echo "$input" | jq -r '.file_path // empty' 2>/dev/null || echo "")
+      # Parse command and exit code from input
+      command=$(echo "$input" | jq -r '.command // empty' 2>/dev/null || echo "")
+      exit_code=$(echo "$input" | jq -r '.exit_code // 0' 2>/dev/null || echo "0")
 
-      if [[ -z "$file_path" ]]; then
-        # Allow the action if no file path
-        echo '{"continue": true, "permission": "allow"}'
+      if [[ -z "$command" ]]; then
         exit 0
       fi
 
-      # Run Mosaic-specific context injection
-      if [ -f ".cursor/hooks/pre-read-mosaic-context.sh" ]; then
-        ./.cursor/hooks/pre-read-mosaic-context.sh "{\"file_path\": \"$file_path\"}" 2>/dev/null || true
+      # Log command execution
+      if [[ $exit_code -ne 0 ]]; then
+        echo "Command failed: $command (exit code: $exit_code)" >&2
       fi
-
-      # Run context injection
-      if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
-        ./scripts/llm/hooks/pre-read-context-injection.sh "{\"file_path\": \"$file_path\"}" 2>/dev/null || true
-      fi
-
-      # Run layer awareness
-      if [ -f "scripts/llm/hooks/pre-read-layer-awareness.sh" ]; then
-        ./scripts/llm/hooks/pre-read-layer-awareness.sh "{\"file_path\": \"$file_path\"}" 2>/dev/null || true
-      fi
-
-      # Allow the action
-      echo '{"continue": true, "permission": "allow"}'
 
       exit 0
 
-  - path: hooks/pre-read-mosaic-context.sh
+  - path: hooks/before-submit-prompt.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Mosaic-specific context injection for file reads
-      # Injects Mosaic-specific context when reading mosaic-related files
-
-      set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$file_path" ]]; then
-        exit 0
-      fi
-
-      # Check if file is mosaic-related
-      mosaic_related=false
-      if [[ "$file_path" == cmd/mosaic-* ]] || \
-         [[ "$file_path" == internal/adapter/primary/mcpsrv/* ]] || \
-         [[ "$file_path" == internal/core/domain/* ]] || \
-         [[ "$file_path" == internal/core/ports/* ]] || \
-         [[ "$file_path" == internal/core/services/* ]] || \
-         [[ "$file_path" == internal/adapter/* ]] || \
-         [[ "$file_path" == internal/config/* ]] || \
-         [[ "$file_path" == configs/* ]] || \
-         [[ "$file_path" == docs/mosaic/* ]] || \
-         [[ "$file_path" == docs/architecture/* ]]; then
-          mosaic_related=true
-      fi
-
-      if [[ "$mosaic_related" == false ]]; then
-        exit 0
-      fi
-
-      echo -e "${CYAN}=== MOSAIC FILE CONTEXT ===${NC}"
-      echo "File: $file_path"
-      echo ""
-
-      # Determine which part of mosaic this is
-      if [[ "$file_path" == cmd/mosaic-* ]]; then
-          echo "Mosaic Entry Point"
-          echo "- Main entry points for mosaic binaries"
-          echo "- mosaic-mcp: MCP server for HexxlaDB"
-          echo "- mosaic-create-db: Database initialization"
-          echo ""
-      elif [[ "$file_path" == internal/adapter/primary/mcpsrv/* ]]; then
-          echo "MCP Server Adapter (Primary)"
-          echo "- Implements MCP tool handlers"
-          echo "- Wraps HexxlaDB operations with MCP protocol"
-          echo "- Integrates ratchet validation"
-          echo ""
-      elif [[ "$file_path" == internal/core/domain/* ]]; then
-          echo "Domain Layer"
-          echo "- Pure business entities and value objects"
-          echo "- Zero internal dependencies (only standard library)"
-          echo "- Core hex lattice and seam concepts"
-          echo ""
-      elif [[ "$file_path" == internal/core/ports/* ]]; then
-          echo "Port Layer"
-          echo "- Interface definitions (contracts)"
-          echo "- Primary ports: inbound use cases"
-          echo "- Secondary ports: outbound dependencies"
-          echo ""
-      elif [[ "$file_path" == internal/core/services/* ]]; then
-          echo "Service Layer"
-          echo "- Application use case implementations"
-          echo "- Orchestrates domain logic"
-          echo "- Can depend on domain and ports only"
-          echo ""
-      elif [[ "$file_path" == internal/adapter/* ]]; then
-          echo "Adapter Layer"
-          echo "- Concrete implementations of ports"
-          echo "- Primary adapters: HTTP, gRPC, CLI"
-          echo "- Secondary adapters: Database, APIs, cache"
-          echo ""
-      elif [[ "$file_path" == internal/config/* ]]; then
-          echo "Config Layer"
-          echo "- Configuration structures and loading"
-          echo "- Mosaic runtime configuration"
-          echo "- Ratchet configuration"
-          echo ""
-      elif [[ "$file_path" == configs/* ]]; then
-          echo "Configuration Files"
-          echo "- YAML configuration for mosaic"
-          echo "- ratchet.yaml: Tool flow governance rules"
-          echo "- config.yaml: Runtime configuration"
-          echo ""
-      elif [[ "$file_path" == docs/mosaic/* ]]; then
-          echo "Mosaic Documentation"
-          echo "- Detailed mosaic documentation"
-          echo "- MCP tool documentation"
-          echo "- Configuration guides"
-          echo ""
-      elif [[ "$file_path" == docs/architecture/* ]]; then
-          echo "Architecture Documentation"
-          echo "- Hexagonal architecture guides"
-          echo "- Design flow documentation"
-          echo "- Layer responsibility documentation"
-          echo ""
-      fi
-
-      echo -e "${YELLOW}See docs/mosaic/AGENT_QUICK_REFERENCE.md for Mosaic tool usage${NC}"
-      echo ""
-
-      exit 0
-
-  - path: hooks/pre-mcp-execution.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor pre-mcp-execution hook
-      # Provides mosaic MCP tool guidance
+      # Cursor before-submit-prompt hook
+      # Logs user prompts for auditing
 
       set -euo pipefail
 
@@ -1183,112 +590,108 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      # Parse MCP tool info from cursor input
+      # Parse user prompt from input
+      user_prompt=$(echo "$input" | jq -r '.user_prompt // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$user_prompt" ]]; then
+        exit 0
+      fi
+
+      # Check for potential policy violations
+      if echo "$user_prompt" | grep -qi "password\|secret\|api.key\|token"; then
+        echo "warning: Prompt mentions sensitive terms" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/after-agent-response.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor after-agent-response hook
+      # Logs agent responses for analysis
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse response from input
+      response=$(echo "$input" | jq -r '.response // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$response" ]]; then
+        exit 0
+      fi
+
+      # Log response length for analytics
+      response_length=$(echo "$response" | wc -c)
+      if [[ $response_length -gt 10000 ]]; then
+        echo "info: Large response generated (${response_length} chars)" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/after-agent-thought.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor after-agent-thought hook
+      # Logs agent thought process for debugging
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse thought from input
+      thought=$(echo "$input" | jq -r '.thought // empty' 2>/dev/null || echo "")
+
+      if [[ -z "$thought" ]]; then
+        exit 0
+      fi
+
+      # Log thought for debugging (optional)
+      exit 0
+
+  - path: hooks/before-mcp-execution.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor before-mcp-execution hook
+      # Logs MCP tool usage before execution
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse MCP tool info from input
       mcp_server_name=$(echo "$input" | jq -r '.mcp_server_name // empty' 2>/dev/null || echo "")
       mcp_tool_name=$(echo "$input" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
 
-      # Only process mosaic MCP tools
-      if [[ "$mcp_server_name" != "mosaic" ]] && [[ "$mcp_server_name" != "mosaic-mcp" ]]; then
-        echo '{"continue": true, "permission": "allow"}'
-        exit 0
+      if [[ -n "$mcp_server_name" ]] && [[ -n "$mcp_tool_name" ]]; then
+        echo "info: MCP tool invocation: $mcp_server_name/$mcp_tool_name" >&2
       fi
-
-      # Run the windsurf pre-mcp-tool-use hook
-      if [ -f ".cursor/hooks/pre-mcp-tool-use.sh" ]; then
-        ./.cursor/hooks/pre-mcp-tool-use.sh "$input" 2>/dev/null || true
-      fi
-
-      # Allow the action
-      echo '{"continue": true, "permission": "allow"}'
 
       exit 0
 
-  - path: hooks/pre-mcp-tool-use.sh
+  - path: hooks/after-mcp-execution.sh
     type: file
     content: |
       #!/usr/bin/env bash
-      # Pre-MCP tool use hook for Mosaic
-      # Provides guidance for using Mosaic MCP tools
+      # Cursor after-mcp-execution hook
+      # Logs MCP tool usage after execution
 
       set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      input="$1"
-
-      # Parse MCP tool info
-      tool_name=$(echo "$input" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$tool_name" ]]; then
-        exit 0
-      fi
-
-      echo -e "${CYAN}=== MOSAIC MCP TOOL GUIDANCE ===${NC}"
-      echo "Tool: $tool_name"
-      echo ""
-
-      case "$tool_name" in
-        mosaic_hexxla_search_embedding)
-          echo "Use for: Semantic concept discovery when you don't know exact tags"
-          echo "Pattern: Search → Check retrieval_hint → Load context pack if needed"
-          echo ""
-          ;;
-        mosaic_hexxla_query_cells)
-          echo "Use for: Structured queries with tags, time, spatial filters"
-          echo "Best for: Finding preferences, facts with known tags"
-          echo ""
-          ;;
-        mosaic_hexxla_search_cells)
-          echo "Use for: Exact text/keyword matching"
-          echo "Best for: Finding specific phrases or exact content"
-          echo ""
-          ;;
-        mosaic_hexxla_load_context_pack)
-          echo "Use for: Expand context around seed coordinates"
-          echo "Requires: seeds from prior search (q, r coords)"
-          echo "Pattern: Tune max_ring and budget_tokens_approx"
-          echo ""
-          ;;
-        mosaic_hexxla_put_cell)
-          echo "Use for: Write new cells to Mosaic"
-          echo "Before writing: ALWAYS list tags, search existing content, load context"
-          echo "Critical: Follow retention policy (save_all_turns)"
-          echo ""
-          ;;
-        mosaic_hexxla_list_tags|mosaic_hexxla_tag_counts)
-          echo "Use for: Discover available tag vocabulary"
-          echo "Pattern: List tags → Use high-frequency tags → Only create new if fundamentally different"
-          echo ""
-          ;;
-        mosaic_hexxla_health)
-          echo "Use for: Check DB integrity, embedding options, layout"
-          echo "Run before heavy retrieval if unsure about DB state"
-          echo ""
-          ;;
-      esac
-
-      echo -e "${YELLOW}See docs/mosaic/AGENT_QUICK_REFERENCE.md for detailed tool usage${NC}"
-      echo ""
-
-      exit 0
-
-  - path: hooks/pre-submit-prompt.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Cursor pre-submit-prompt hook
-      # Injects mosaic context before agent reasoning
-
-      set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
@@ -1296,31 +699,65 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      echo -e "${CYAN}=== MOSAIC CONTEXT FOR REASONING ===${NC}"
-      echo ""
-      echo "When reasoning about this task, consider using Mosaic tools:"
-      echo ""
-      echo "1. For context retrieval:"
-      echo "   - Use mosaic_hexxla_search_embedding for concept discovery"
-      echo "   - Use mosaic_hexxla_query_cells for structured queries with tags"
-      echo "   - Use mosaic_hexxla_search_cells for exact text matching"
-      echo "   - After retrieval, check retrieval_hint and call mosaic_hexxla_load_context_pack"
-      echo ""
-      echo "2. For persisting knowledge:"
-      echo "   - ALWAYS call mosaic_hexxla_put_cell for user/assistant messages (retention policy)"
-      echo "   - Before writing: list tags, search existing content, load context"
-      echo "   - Use mosaic_hexxla_list_tags and mosaic_hexxla_tag_counts for tag discovery"
-      echo "   - Prefer high-frequency tags, avoid compound tags"
-      echo ""
-      echo "3. For Mosaic MCP tools specifically:"
-      echo "   - See docs/mosaic/AGENT_QUICK_REFERENCE.md for detailed patterns"
-      echo "   - Follow intelligent read/write patterns in rules/"
-      echo ""
-      echo -e "${YELLOW}Retention Policy: save_all_turns — persist automatically without asking${NC}"
-      echo ""
+      # Parse MCP tool info from input
+      mcp_server_name=$(echo "$input" | jq -r '.mcp_server_name // empty' 2>/dev/null || echo "")
+      mcp_tool_name=$(echo "$input" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
+      mcp_result=$(echo "$input" | jq -r '.mcp_result // empty' 2>/dev/null || echo "")
 
-      # Allow the action
-      echo '{"continue": true, "permission": "allow"}'
+      if [[ -n "$mcp_server_name" ]] && [[ -n "$mcp_tool_name" ]]; then
+        echo "info: MCP tool completed: $mcp_server_name/$mcp_tool_name" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/subagent-start.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor subagent-start hook
+      # Logs when a subagent starts
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse subagent info from input
+      subagent_id=$(echo "$input" | jq -r '.subagent_id // empty' 2>/dev/null || echo "")
+      model=$(echo "$input" | jq -r '.model // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$subagent_id" ]]; then
+        echo "info: Subagent started: $subagent_id (model: $model)" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/subagent-stop.sh
+    type: file
+    content: |
+      #!/usr/bin/env bash
+      # Cursor subagent-stop hook
+      # Logs when a subagent stops
+
+      set -euo pipefail
+
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
+
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse subagent info from input
+      subagent_id=$(echo "$input" | jq -r '.subagent_id // empty' 2>/dev/null || echo "")
+      duration_ms=$(echo "$input" | jq -r '.duration_ms // empty' 2>/dev/null || echo "")
+      modified_files=$(echo "$input" | jq -r '.modified_files[]' 2>/dev/null || echo "")
+
+      if [[ -n "$subagent_id" ]]; then
+        echo "info: Subagent stopped: $subagent_id (duration: ${duration_ms}ms)" >&2
+      fi
 
       exit 0
 
@@ -1329,7 +766,7 @@ structure:
     content: |
       #!/usr/bin/env bash
       # Cursor session-start hook
-      # Injects mosaic context at session start
+      # Initializes session with environment variables
 
       set -euo pipefail
 
@@ -1339,251 +776,63 @@ structure:
       # Read JSON input from stdin
       input=$(cat)
 
-      # Allow the action
-      echo '{"continue": true, "permission": "allow"}'
+      # Parse session info from input
+      session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null || echo "")
+      composer_mode=$(echo "$input" | jq -r '.composer_mode // empty' 2>/dev/null || echo "")
+
+      # Set environment variables for this session
+      echo "{\"env\": {\"PROJECT_ROOT\": \"$ROOT\"}}"
+
+      # Add additional context for the session
+      echo "{\"additional_context\": \"Working in Go project with Hexagonal Architecture. Follow AGENTS.md for guidelines.\"}"
 
       exit 0
 
-  # === Skills ===
-  - path: skills/hexagonal-review/SKILL.md
+  - path: hooks/session-end.sh
     type: file
     content: |
-      ---
-      name: hexagonal-review
-      description: Reviews code for Hexagonal Architecture compliance
-      ---
+      #!/usr/bin/env bash
+      # Cursor session-end hook
+      # Logs session end for analytics
 
-      # Hexagonal Architecture Review Skill
+      set -euo pipefail
 
-      When reviewing changes:
-      - Verify `core/domain/` purity
-      - Check that `core/services/` only uses ports
-      - Ensure adapters properly implement secondary ports
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
 
-  - path: skills/hexagonal-review/SKILL.md
+      # Read JSON input from stdin
+      input=$(cat)
+
+      # Parse session info from input
+      session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null || echo "")
+      reason=$(echo "$input" | jq -r '.reason // empty' 2>/dev/null || echo "")
+      duration_ms=$(echo "$input" | jq -r '.duration_ms // empty' 2>/dev/null || echo "")
+
+      if [[ -n "$session_id" ]]; then
+        echo "info: Session ended: $session_id (reason: $reason, duration: ${duration_ms}ms)" >&2
+      fi
+
+      exit 0
+
+  - path: hooks/workspace-open.sh
     type: file
     content: |
-      ---
-      name: hexagonal-review
-      description: Reviews code for Hexagonal Architecture compliance
-      ---
+      #!/usr/bin/env bash
+      # Cursor workspace-open hook
+      # Initializes workspace with necessary configurations
 
-      # Hexagonal Architecture Review Skill
+      set -euo pipefail
 
-      When reviewing changes:
-      - Verify `core/domain/` purity
-      - Ensure `core/services/` only uses ports
-      - Confirm adapters properly implement secondary ports
+      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+      cd "$ROOT"
 
-  - path: skills/security-review/SKILL.md
-    type: file
-    content: |
-      ---
-      name: security-review
-      description: Performs security review on code changes
-      ---
+      # Read JSON input from stdin
+      input=$(cat)
 
-      # Security Review Skill
+      # Parse workspace info from input
+      workspace_roots=$(echo "$input" | jq -r '.workspace_roots[]' 2>/dev/null || echo "")
 
-      When reviewing code:
-      - Look for hardcoded secrets or credentials
-      - Check for insecure error handling or logging of sensitive data
-      - Verify input validation and context usage
-      - Ensure compliance with security rules
+      # Return plugin paths if any
+      echo "{\"pluginPaths\": []}"
 
-  - path: skills/error-handling/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-error-handling
-      description: Validates Go error handling patterns
-      ---
-
-      # Go Error Handling Skill
-
-      When reviewing or writing Go code:
-      - Ensure all errors are checked and not ignored
-      - Validate error wrapping with `%w` for context preservation
-      - Check that error messages are informative and actionable
-      - Recommend using `errors.Is` and `errors.As` for error comparison
-      - Ensure errors are returned early when possible (fail fast)
-      - Validate error types are appropriate for the domain
-      - Check for proper error propagation through the call stack
-      - Avoid returning wrapped errors at package boundaries
-      - Use custom error types for domain-specific errors
-      - Ensure error variables are exported for use by callers
-
-  - path: skills/context-usage/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-context-usage
-      description: Validates Go context.Context usage patterns
-      ---
-
-      # Go Context Usage Skill
-
-      When reviewing or writing Go code:
-      - Ensure context.Context is the first parameter in functions that need it
-      - Validate context is not stored in struct fields
-      - Check that context is not used as a value in struct fields
-      - Ensure context is passed through the call chain properly
-      - Validate context cancellation is checked with select statements
-      - Ensure context is not nil when used
-      - Check that context is not used in exported API signatures incorrectly
-      - Validate context deadlines are set appropriately
-      - Ensure context values are used sparingly and for request-scoped data
-      - Check that context.WithValue is used for request-scoped metadata only
-
-  - path: skills/concurrency/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-concurrency
-      description: Validates Go concurrency patterns
-      ---
-
-      # Go Concurrency Skill
-
-      When reviewing or writing Go code:
-      - Validate goroutines are properly awaited (WaitGroup, channels)
-      - Check for potential goroutine leaks
-      - Ensure channels are closed correctly (by sender, not receiver)
-      - Validate mutex usage (Lock/Unlock pairs, defer Unlock)
-      - Check for data races in concurrent code
-      - Ensure select statements have default cases where appropriate
-      - Validate channel buffer sizes are appropriate
-      - Check for proper error handling in goroutines
-      - Ensure atomic operations are used where needed
-      - Recommend using sync.Pool for object reuse
-      - Validate that shared state is properly protected
-
-  - path: skills/test-coverage/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-test-coverage
-      description: Analyzes Go test coverage and suggests improvements
-      ---
-
-      # Go Test Coverage Skill
-
-      Coverage numbers are a floor, not a ceiling. A test that executes code but asserts nothing is noise. Semantic coverage is what matters: do your tests catch real bugs? Mutation testing (Gremlins) validates this by introducing small bugs — if your tests pass, they are too weak.
-
-      <checklist>
-      1. [ ] Tests assert specific return values — not just `err == nil`
-      2. [ ] Table-driven tests for multiple scenarios using `t.Run`
-      3. [ ] Error branches tested explicitly
-      4. [ ] Edge cases: empty/nil input, zero values, boundary conditions
-      5. [ ] Tests deterministic — no `time.Now()`, no global state, no random without seed
-      6. [ ] Mocks implement port interfaces, not concrete types
-      7. [ ] Integration tests use `//go:build integration` tag
-      8. [ ] Coverage ≥80% on `core/domain/` and `core/services/`
-      9. [ ] Test file naming: `foo_test.go` alongside `foo.go`
-      10. [ ] `make ci` passes with all tests
-      </checklist>
-
-      <mutation_testing>
-      Run `make mutation-test-dry` for a fast check. For critical domain code, run `make mutation-test`:
-
-      <checklist>
-      1. [ ] `make mutation-test-dry` passes (mutants are testable)
-      2. [ ] Mutation score ≥80% (80%+ of mutants killed)
-      3. [ ] No "LIVED" mutants on critical code paths (tests should catch introduced bugs)
-      4. [ ] If mutation score is low, add specific assertions that would fail on the mutant
-      </checklist>
-
-      <examples>
-      <example>BAD: `result, err := Add(2, 3); assert.NoError(t, err)` — mutation changes `+` to `-`, test still passes</example>
-      <example>GOOD: `result, _ := Add(2, 3); assert.Equal(t, 5, result)` — mutation caught, assertion fails</example>
-      </examples>
-      </mutation_testing>
-
-  - path: skills/interface-design/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-interface-design
-      description: Validates Go interface design and abstractions
-      ---
-
-      # Go Interface Design Skill
-
-      When reviewing or writing Go code:
-      - Ensure interfaces are small and focused (single responsibility)
-      - Validate interfaces are defined by the consumer, not the implementer
-      - Check that interfaces don't leak implementation details
-      - Recommend interface composition over large interfaces
-      - Ensure interfaces are named after behavior (e.g., Reader, Writer)
-      - Validate that empty interfaces are used only for type assertions
-      - Check for unnecessary interface abstraction
-      - Recommend concrete types where interfaces are overkill
-      - Ensure interface methods are cohesive and related
-      - Validate that interface changes are backward compatible
-
-  - path: skills/struct-tag/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-struct-tag
-      description: Validates Go struct tags for serialization
-      ---
-
-      # Go Struct Tag Skill
-
-      When reviewing or writing Go code:
-      - Ensure JSON tags match exported field names (snake_case or camelCase)
-      - Validate YAML tags are present where needed
-      - Check that database tags match column names
-      - Ensure omitempty is used appropriately
-      - Validate that required fields don't have omitempty
-      - Check for duplicate or conflicting tags
-
-  - path: skills/complexity/SKILL.md
-    type: file
-    content: |
-      ---
-      name: go-complexity
-      description: Validates Go code complexity against layer-specific thresholds
-      ---
-
-      # Go Complexity Skill
-
-      When reviewing or writing Go code, check complexity against hexagonal architecture layer thresholds:
-
-      ## Layer Thresholds
-
-      | Layer | Cyclomatic Max | Cognitive Max |
-      |-------|---------------|---------------|
-      | `core/domain/` | 5 | 10 |
-      | `core/ports/` | 3 | 5 |
-      | `core/services/` | 10 | 15 |
-      | `adapter/primary/` | 15 | 20 |
-      | `adapter/secondary/` | 12 | 18 |
-
-      ## When Writing Code
-
-      - Keep functions small and focused (single responsibility)
-      - Avoid deeply nested conditions (use early returns instead)
-      - Use guard clauses to reduce nesting
-      - Extract complex logic into smaller helper functions
-      - Replace nested if/else with switch statements where appropriate
-      - Aim for max 3-4 levels of nesting
-
-      ## When Reviewing Code
-
-      - Identify the hexagonal layer of the code
-      - Check if cyclomatic complexity exceeds layer threshold
-      - Check if cognitive complexity exceeds layer threshold
-      - Suggest refactoring if thresholds are exceeded
-      - Recommend extracting helper functions for complex logic
-      - Suggest using early returns to reduce nesting
-
-      ## CRAP Score Considerations
-
-      - High CRAP = complex AND poorly tested = dangerous to change
-      - If CRAP is high, suggest either:
-        1. Refactoring to reduce complexity
-        2. Adding specific test assertions
-        3. Adding property-based tests for domain logic
-        4. Adding contract tests for port implementations
+      exit 0

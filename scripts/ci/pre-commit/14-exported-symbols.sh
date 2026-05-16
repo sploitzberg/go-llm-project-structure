@@ -4,16 +4,10 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-echo -e "${CYAN}> Running exported symbol validation${NC}"
+echo "> Running exported symbol validation"
 
 if [ ! -d "internal/core/domain" ]; then
-    echo -e "${YELLOW}warning:${NC} No domain directory found, skipping"
+    echo "warning: No domain directory found, skipping"
     exit 0
 fi
 
@@ -24,7 +18,7 @@ warnings=0
 domain_files=$(find internal/core/domain -name "*.go" 2>/dev/null || true)
 
 for file in $domain_files; do
-    # Find exported types
+    # Get exported types
     exported_types=$(grep -E "^type [A-Z]" "$file" | awk '{print $2}' || true)
 
     for type in $exported_types; do
@@ -35,7 +29,7 @@ for file in $domain_files; do
             exported_fields=$(grep -A 20 "^type $type struct" "$file" | grep -E "^\s+[A-Z]" | awk '{print $1}' || true)
 
             if [ -n "$exported_fields" ]; then
-                echo -e "${YELLOW}warning:${NC} Domain struct $type in $file has exported fields: $exported_fields"
+                echo "warning: Domain struct $type in $file has exported fields: $exported_fields"
                 warnings=$((warnings + 1))
             fi
         fi
@@ -52,24 +46,24 @@ for file in $domain_files; do
         fi
 
         # Warn about other exported functions that might be internal
-        echo -e "${YELLOW}warning:${NC} Domain file $file has exported function $func_name that might be an implementation detail"
-        ((warnings++))
+        echo "warning: Domain file $file has exported function $func_name that might be an implementation detail"
+        warnings=$((warnings + 1))
     done
 done
 
 # Check that domain doesn't export implementation patterns
 if grep -r "internal.*adapter\|internal.*core/services" internal/core/domain 2>/dev/null | grep -q .; then
-    echo -e "${RED}error:${NC} Domain has references to adapter or services packages"
-    ((errors++))
+    echo "error: Domain has references to adapter or services packages"
+    errors=$((errors + 1))
 fi
 
 if ((errors > 0)); then
-    echo -e "${RED}error:${NC} Exported symbol validation failed with $errors error(s)"
+    echo "error: Exported symbol validation failed with $errors error(s)"
     exit 1
 elif ((warnings > 0)); then
-    echo -e "${YELLOW}warning:${NC} Exported symbol validation passed with $warnings warning(s)"
+    echo "warning: Exported symbol validation passed with $warnings warning(s)"
     exit 0
 fi
 
-echo -e "${GREEN}Exported symbols: OK${NC}"
+echo "Exported symbols: OK"
 echo

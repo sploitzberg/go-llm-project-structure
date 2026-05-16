@@ -7,17 +7,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-echo -e "${CYAN}> Running secret scanning${NC}"
+echo "> Running secret scanning"
 
 errors=0
 
 die() {
-    echo -e "${RED}error:${NC} $*" >&2
+    echo "error: $*" >&2
     ((errors++))
 }
 
@@ -66,10 +61,10 @@ fi
 # ======================
 
 if ((errors > 0)); then
-    echo -e "${RED}error:${NC} Secret scanning FAILED with $errors finding(s)"
+    echo "error: Secret scanning FAILED with $errors finding(s)"
     echo "Please remove any secrets before committing."
     exit 1
 else
-    echo -e "${GREEN}Secret scanning: OK${NC}"
+    echo "Secret scanning: OK"
 fi
 echo

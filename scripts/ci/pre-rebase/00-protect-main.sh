@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# scripts/ci/pre-rebase-protect-main.sh
-# Prevent rebasing protected branches
+# scripts/ci/pre-rebase/00-protect-main.sh
+# Prevent rebasing main/master branches
 
 set -euo pipefail
 
-RED='\033[0;31m'
-NC='\033[0m'
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 
-protected="main master"
-current=$(git branch --show-current)
-
-for branch in $protected; do
-    if [ "$current" = "$branch" ]; then
-        echo -e "${RED}error:${NC} Rebasing the $branch branch is not allowed."
-        exit 1
-    fi
-done
-echo
+if [[ "$branch" == "main" ]] || [[ "$branch" == "master" ]]; then
+    echo "error: Rebasing the $branch branch is not allowed."
+    exit 1
+fi

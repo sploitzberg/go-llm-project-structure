@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-echo "Checking hexagonal architecture rules..."
+echo "> Checking hexagonal architecture rules"
 
 if [[ -f ./scripts/ci/hex-arch-guardrail.sh ]]; then
     ./scripts/ci/hex-arch-guardrail.sh

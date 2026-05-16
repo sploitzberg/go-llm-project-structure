@@ -1,5 +1,5 @@
 # Slower `//go:build integration` tests — not in default PR CI (see README).
-# Weekly + manual; use `make integration` before releases.
+# Weekly + manual; use `task integration` before releases.
 name: Integration
 
 on:

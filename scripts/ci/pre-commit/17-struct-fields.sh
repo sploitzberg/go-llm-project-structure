@@ -4,15 +4,10 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-echo -e "${CYAN}> Running struct field validation${NC}"
+echo "> Running struct field validation"
 
 if [ ! -d "internal/core/domain" ]; then
-    echo -e "${GREEN}No domain directory found, skipping${NC}"
+    echo "No domain directory found, skipping"
     exit 0
 fi
 
@@ -36,16 +31,16 @@ for file in $domain_files; do
         # Check for field types that might be external dependencies
         # Look for types from other internal packages
         if echo "$struct_body" | grep -E "internal/(adapter|core/services|core/ports)" | grep -q .; then
-            echo -e "${RED}error:${NC} $file:$line_num Struct $struct_name has fields from adapter/services/ports packages"
+            echo "error: $file:$line_num Struct $struct_name has fields from adapter/services/ports packages"
             echo "$struct_body" | grep -E "internal/(adapter|core/services|core/ports)"
-            ((errors++))
+            errors=$((errors + 1))
         fi
 
         # Check for framework types in domain structs
         if echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql|http\.ResponseWriter|http\.Request)" | grep -q .; then
-            echo -e "${RED}error:${NC} $file:$line_num Struct $struct_name has framework types (forbidden in domain)"
+            echo "error: $file:$line_num Struct $struct_name has framework types (forbidden in domain)"
             echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql|http\.ResponseWriter|http\.Request)"
-            ((errors++))
+            errors=$((errors + 1))
         fi
     done <<< "$struct_defs"
 done
@@ -66,19 +61,19 @@ for dir in internal/core/services internal/core/ports; do
             struct_body=$(sed -n "${line_num},/^}/p" "$file" || true)
 
             # Check for framework types in services/ports
-            if echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql)" | grep -q .; then
-                echo -e "${RED}error:${NC} $file:$line_num Struct in $dir has framework types (forbidden)"
-                echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql)"
-                ((errors++))
+            if echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql|http\.ResponseWriter|http\.Request)" | grep -q .; then
+                echo "error: $file:$line_num Struct in $dir has framework types (forbidden)"
+                errors=$((errors + 1))
+                echo "$struct_body" | grep -E "(github\.com/gin|github\.com/gorilla|database/sql|http\.ResponseWriter|http\.Request)"
             fi
         done <<< "$struct_defs"
     done
 done
 
 if ((errors > 0)); then
-    echo -e "${RED}error:${NC} Struct field validation failed with $errors error(s)"
+    echo "error: Struct field validation failed with $errors error(s)"
     exit 1
 fi
 
-echo -e "${GREEN}Struct fields: OK${NC}"
+echo "Struct fields: OK"
 echo

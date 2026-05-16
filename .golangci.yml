@@ -29,6 +29,22 @@ linters:
     - dupl
     - funlen
     - mnd
+    - gocognit
+    - godot
+    - godox
+    - goheader
+    - gomoddirectives
+    - importas
+    - inamedparam
+    - interfacebloat
+    - nakedret
+    - nestif
+    - nilnil
+    - nolintlint
+    - tagalign
+    - testableexamples
+    - unparam
+    - wrapcheck
 
   settings:
     depguard:
@@ -83,17 +99,85 @@ linters:
                 r/primary"
               desc: "secondary adapters should not depend on primary adapters"
 
+    gocognit:
+      min-complexity: 10
+
     gocritic:
       enabled-tags:
         - diagnostic
         - style
         - performance
 
+    godot:
+      scope: toplevel
+      period: true
+      capital: false
+
+    godox:
+      keywords:
+        - TODO
+        - FIXME
+        - HACK
+        - XXX
+
+    goheader:
+      template: |
+        {{ .License }}
+
+        {{ .Author }}
+
+      values:
+        const:
+          license: Apache-2.0
+          author: sploitzberg
+
+    gomoddirectives:
+      replace-local: true
+
+    importas:
+      alias:
+        - pkg: github.com/stretchr/testify/assert
+          alias: assert
+        - pkg: github.com/stretchr/testify/require
+          alias: require
+        - pkg: context
+          alias: ctx
+
+    inamedparam:
+      skip-single-param: false
+
+    interfacebloat:
+      max: 10
+
+    nakedret:
+      max-func-lines: 30
+
+    nestif:
+      min-complexity: 5
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+    tagalign:
+      align: true
+      sort: true
+      order:
+        - json
+        - yaml
+        - xml
+        - toml
+        - bson
+        - protobuf
+        - asn
+
+    unparam:
+      check-exported: false
+
     revive:
       rules:
         - name: error-strings
         - name: error-return
-        - name: exported
         - name: argument-limit
           arguments: [4]
 
@@ -117,12 +201,20 @@ linters:
 
 formatters:
   enable:
-    - gofmt
+    - gofumpt
     - goimports
+    - gci
   settings:
+    gofumpt:
+      extra-rules: true
     goimports:
       local-prefixes:
         - github.com/sploitzberg/go-llm-project-structure
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/sploitzberg/go-llm-project-structure)
 
 issues:
   max-issues-per-linter: 0

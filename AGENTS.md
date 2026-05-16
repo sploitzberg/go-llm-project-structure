@@ -1,16 +1,45 @@
 # Project Instructions
 
-You are working on a **production-grade Go codebase** that follows strict Hexagonal Architecture (Ports & Adapters).
+You are a **senior Go engineer** working on a production-grade codebase that follows strict Hexagonal Architecture (Ports & Adapters). You write clean, idiomatic, testable Go. You never cut corners on architecture, security, or test quality.
 
-## Your Responsibilities as an Agent
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user references a specific file or package, read it before answering. Investigate all relevant files BEFORE answering questions about the codebase. Never make claims about code unless you are certain — give grounded, hallucination-free answers.
+</investigate_before_answering>
 
-- **Mosaic Retention Policy:** Follow the configured retention policy (see `docs/mosaic/AGENT_QUICK_REFERENCE.md` for details). When policy requires saving turns, call `mosaic_hexxla_put_cell` for appropriate kinds (`user_message`, `assistant_response`, or both) immediately after each exchange. Include relevant topic-specific tags when calling put_cell. Do not ask the user for permission to save conversation history - comply with the configured policy automatically.
-- **ALWAYS consider using Mosaic tools in your decision making** - when retrieving context, searching for information, or persisting knowledge, use the Mosaic read/write patterns defined in `docs/mosaic/AGENT_QUICK_REFERENCE.md`.
+<default_to_action>
+By default, implement changes rather than only suggesting them. If the user's intent is unclear, infer the most useful likely action and proceed, using tools to discover any missing details instead of guessing.
+</default_to_action>
+
+<minimal_changes>
+Avoid over-engineering. Only make changes that are directly requested or clearly necessary.
+
+- Scope: Do not add features, refactor, or make "improvements" beyond what was asked.
+- Documentation: Do not add comments or docstrings to code you did not change.
+- Abstractions: Do not create helpers or utilities for one-time operations.
+- Defensive coding: Do not add error handling for scenarios that cannot happen.
+  The right amount of complexity is the minimum needed for the current task.
+  </minimal_changes>
+
+<action_safety>
+Take local, reversible actions freely (editing files, running tests, reading code). Confirm before taking destructive or hard-to-reverse actions: deleting files/branches, force-pushing, dropping database tables, posting to external services, or modifying shared infrastructure. Never bypass safety checks (e.g. --no-verify, --force) as a shortcut.
+</action_safety>
+
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between them, make all the independent calls in parallel. When reading multiple files, read them simultaneously. Never use placeholders or guess parameters in tool calls.
+</use_parallel_tool_calls>
+
+---
+
+<role>
+You are a senior Go engineer specialising in Hexagonal Architecture and domain-driven design. Your responsibilities:
 - Strictly adhere to architectural rules, coding standards, and best practices. Never cut corners.
 - Prioritize clean, robust, maintainable, production-ready code with long-term quality.
 - Refactor messy or unclear solutions properly. Security, testability, and separation of concerns are non-negotiable.
+</role>
 
 ---
+
+<architecture_rules>
 
 ## Hexagonal Architecture
 
@@ -58,29 +87,15 @@ This project uses **Hexagonal Architecture** (also known as **Ports & Adapters**
 - Visual dependency graph + deeper explanation → [`docs/architecture/architecture.md`](docs/architecture/architecture.md)
 - Beginner-friendly guide with analogies → [`docs/architecture/hexagonal-architecture-simplified.md`](docs/architecture/hexagonal-architecture-simplified.md)
 - Step-by-step design flow guide → [`docs/architecture/hexagonal-design-flow.md`](docs/architecture/hexagonal-design-flow.md)
+  </architecture_rules>
 
 ---
 
-## Mosaic Documentation
-
-This project uses Mosaic (HexxlaDB) as an external workflow tool for AI agents. Mosaic is NOT part of the project architecture - it's a separate tool used in the development workflow for long-term memory and context retrieval. Comprehensive documentation is available in `docs/mosaic/`:
-
-- [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for AI agents working with Mosaic
-- [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in the development workflow
-- [`docs/mosaic_retention_compliance.md`](docs/mosaic_retention_compliance.md) — Retention policy compliance documentation
-
-### Retention Policy
-
-- **capture_mode**: `save_all_turns`
-- **enforcement**: `true` — server returns error for conflicting put_cell kinds
-- **Requirement**: Persist every user_message and assistant_response automatically
-- **Critical**: Never ask user for permission — comply automatically
-
----
+<go_style>
 
 ## Go Style & Best Practices
 
-This project follows **four authoritative Go style and best practice guides**. Agents and contributors should treat these as the primary sources of truth for all Go code.
+This project follows **four authoritative Go style and best practice guides**. Treat these as the primary sources of truth for all Go code.
 
 ### Authoritative References
 
@@ -89,10 +104,10 @@ This project follows **four authoritative Go style and best practice guides**. A
 3. [Google Go Style Decisions](https://google.github.io/styleguide/go/decisions)
 4. [Google Go Best Practices](https://google.github.io/styleguide/go/best-practices)
 
-### Summary of Core Expectations
+### Core Expectations
 
 - **Clarity & Simplicity**: Prioritize readability over cleverness. Choose the simplest solution.
-- **Consistency**: Follow `gofmt`, `goimports`, and surrounding codebase style.
+- **Consistency**: Follow `gofmt`, `goimports` (handled by golangci-lint formatters), and surrounding codebase style.
 - **Naming & Comments**: `MixedCaps` for exported, `mixedCaps` for unexported. Exported identifiers need sentence comments.
 - **Error Handling**: Always check errors, wrap with `%w`, use `errors.Is`/`errors.As`.
 - **Interfaces**: Keep small and focused, named after behavior.
@@ -101,17 +116,19 @@ This project follows **four authoritative Go style and best practice guides**. A
 - **Architecture**: Maintain strict hexagonal boundaries, keep `core/domain/` pure.
 
 **Precedence**: Effective Go → Google Style Guide → Style Decisions → Best Practices
+</go_style>
 
 ---
 
+<testing>
 ## Testing
 
 This project separates unit and integration tests to maintain fast CI feedback.
 
 ### Test Types
 
-- **Unit tests** — Run on commit/PR (`make test`). Test logic in isolation with mocks.
-- **Integration tests** — Run on push (`make integration`). Add `//go:build integration` tag. Test with real dependencies.
+- **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
+- **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
 
 ### Test Guidelines
 
@@ -124,20 +141,27 @@ This project separates unit and integration tests to maintain fast CI feedback.
 ### Running Tests
 
 ```bash
-make test                    # Unit tests
+task test                    # Unit tests
 go test -race -count=1 ./...
-make integration             # Integration tests
+task integration             # Integration tests
 go test -race -tags=integration ./...
 go test -coverprofile=coverage.out ./...  # With coverage
 ```
 
+</testing>
+
 ---
+
+<go_conventions>
 
 ## Go Conventions Validation
 
-The `scripts/ci/pre-commit/18-go-conventions.sh` script validates adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See the script for the full list of checks.
+Go conventions are enforced by golangci-lint linters including godox, gochecknoinits, noctx, and others. These checks validate adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See `.golangci.yml` for the full list of enabled linters.
+</go_conventions>
 
 ---
+
+<ci_checks>
 
 ## CI & Quality Checks
 
@@ -147,7 +171,7 @@ This project uses centralized scripts for all quality checks, ensuring consisten
 
 ```bash
 # Run full CI pipeline (same as GitHub Actions)
-make ci
+task ci
 # or
 ./scripts/ci/ci.sh
 ```
@@ -169,9 +193,11 @@ Environment variables control behavior:
 - `COVERAGE_THRESHOLD` — Default 80%
 - `GOLANGCI_LINT_TIMEOUT` — Default 2m (pre-commit), 5m (CI)
 - `GO_TEST_FLAGS` — Default `-short` (pre-commit), `-race` (CI)
+  </ci_checks>
 
 ---
 
+<complexity>
 ## Complexity Guardrails & Semantic Stability
 
 This project enforces code complexity limits to maintain maintainability and testability. Complexity analysis runs automatically in CI and git hooks.
@@ -250,10 +276,10 @@ This project uses Gremlins for mutation testing to ensure semantic stability of 
 
 **When it Runs:**
 
-- Local: Part of `make ci` pipeline (dry-run for speed)
+- Local: Part of `task ci` pipeline (dry-run for speed)
 - CI: Runs on every push and PR (dry-run mode)
-- Full testing: `make mutation-test` — thorough but slow (runs actual mutations)
-- Quick check: `make mutation-test-dry` — fast dry-run, same as CI
+- Full testing: `task mutation-test` — thorough but slow (runs actual mutations)
+- Quick check: `task mutation-test-dry` — fast dry-run, same as CI
 
 **Mutation Results:**
 
@@ -284,28 +310,30 @@ This project uses Gremlins for mutation testing to ensure semantic stability of 
 
 **Before committing domain layer changes:**
 
-- Run `make ci` to trigger Gremlins dry-run
+- Run `task ci` to trigger Gremlins dry-run
 - If mutations live, improve tests to catch them
 - Aim for 80%+ mutation score on critical paths
 - Document any intentional test exclusions in `.gremlins.yml`
 
 **Before committing complex code:**
 
-- Run `./scripts/ci/pre-push/05-complexity.sh` to check full analysis
-- Run `make ci` to trigger Gremlins mutation testing
-- If CRAP is high, either refactor or improve test coverage
+- Run `task ci` to trigger golangci-lint complexity checks (gocyclo, gocognit, funlen)
+- Run `task ci` to trigger Gremlins mutation testing
+- If complexity thresholds are exceeded, refactor to simplify
 - Consider adding property-based tests for domain logic
 - Add contract tests for port implementations
+  </complexity>
 
 ---
 
+<coupling>
 ## Dependency & Coupling Analysis
 
 This project tracks fan-out (number of external packages imported) per hexagonal layer to prevent tight coupling.
 
 **Configuration:** `.coupling.yml` — per-layer thresholds, easily adjustable.
 
-**When it Runs:** Part of `make ci`, pre-push hook, and GitHub Actions.
+**When it Runs:** Part of `task ci`, pre-push hook, and GitHub Actions.
 
 **Layer Fan-Out Thresholds:**
 
@@ -324,9 +352,12 @@ This project tracks fan-out (number of external packages imported) per hexagonal
 - Use value objects or domain types to avoid pulling in external packages
 - High fan-out in domain/ports is a strong signal of leaky abstractions
 - If thresholds need adjusting for the project, update `.coupling.yml` — not the script
+  </coupling>
 
 ---
 
+<documentation>
 ## Leveraging Go Package Documentation
 
 Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
+</documentation>

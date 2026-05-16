@@ -10,7 +10,7 @@ git clone https://github.com/sploitzberg/go-llm-project-structure.git
 cd go-llm-project-structure
 
 # Setup LLM tool configuration
-make llm-setup
+task llm-setup
 
 # Select your LLM provider (Cursor, Claude, Windsurf, Continue, Copilot, or Codex)
 # Sensible defaults are applied automatically
@@ -49,8 +49,8 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
   - If tests fail → mutation "killed" (good — tests are meaningful)
   - Target: `core/domain/` by default, configurable via `.gremlins.yml`
   - Threshold: 80%+ mutants killed
-  - CI: Dry-run on every push (`make mutation-test-dry`)
-  - Full run: `make mutation-test` (slow, thorough)
+  - CI: Dry-run on every push (`task mutation-test-dry`)
+  - Full run: `task mutation-test` (slow, thorough)
 
 ### Dependency & Coupling Analysis
 
@@ -66,7 +66,7 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 - No `time.Sleep()` in production code
 - No `os.Exit()` in non-main packages
 - No `init()` functions in production code
-- And more (see `scripts/ci/pre-commit/18-go-conventions.sh`)
+- And more (enforced by golangci-lint linters: godox, gochecknoinits, noctx, etc.)
 
 ### Security Checks
 
@@ -90,35 +90,11 @@ This project follows Hexagonal Architecture with these layers:
 - `internal/adapter/` — Concrete implementations (HTTP, database, etc.)
 - `internal/config/` — Configuration structures
 
-## Mosaic Integration
+## LLM Platform Integration
 
-This project includes **Mosaic (HexxlaDB)** integration for AI-assisted long-term memory and context retrieval. Mosaic is an external workflow tool that enhances LLM coding assistants with:
-
-- **Semantic Search** - Discover related code, decisions, and patterns using embeddings
-- **Structured Queries** - Find information by tags, time, or spatial proximity
-- **Context Expansion** - Load neighboring context from the hex lattice for comprehensive understanding
-- **Knowledge Persistence** - Automatically capture user/assistant exchanges for future reference
-
-### Retention Policy
-
-The project uses `save_all_turns` retention policy:
-
-- Every user_message and assistant_response is automatically persisted
-- No user permission required - compliance is automatic
-- Enforced through Mosaic MCP server configuration
-
-### Mosaic Documentation
-
-- [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for AI agents
-- [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in development
-- [`docs/mosaic_retention_compliance.md`](docs/mosaic_retention_compliance.md) — Retention policy compliance
-
-### LLM Platform Integration
-
-Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claude, Continue, Copilot, Codex) with:
+This project supports integration with various LLM platforms through platform-specific configuration files in `scripts/llm/platforms/`. These configurations provide:
 
 - Platform-specific hooks for context injection
-- Mosaic MCP tool guidance
 - Intelligent read/write patterns
 - Tag reuse conventions
 
@@ -135,26 +111,26 @@ Mosaic is integrated across all supported LLM platforms (Windsurf, Cursor, Claud
 - [`.gremlins.yml`](.gremlins.yml) — Mutation testing configuration (Gremlins)
 - [`.coupling.yml`](.coupling.yml) — Dependency & coupling analysis thresholds (goda)
 
-## Makefile Targets
+## Task Targets
 
-- `make build` — Build the binary
-- `make test` — Run unit tests
-- `make test-all` — Run both unit and integration tests
-- `make integration` — Run integration tests (slower, external dependencies)
-- `make lint` — Run golangci-lint
-- `make fmt` — Format code
-- `make ci` — Run full CI checks
-- `make install` — Install locally
-- `make llm-setup` — Setup LLM tool configurations
-- `make mutation-test` — Full mutation testing with Gremlins (slow, thorough)
-- `make mutation-test-dry` — Fast mutation dry-run (CI mode)
+- `task build` — Build the binary
+- `task test` — Run unit tests
+- `task test-all` — Run both unit and integration tests
+- `task integration` — Run integration tests (slower, external dependencies)
+- `task lint` — Run golangci-lint
+- `task fmt` — Format code
+- `task ci` — Run full CI checks
+- `task install` — Install locally
+- `task llm-setup` — Setup LLM tool configurations
+- `task mutation-test` — Full mutation testing with Gremlins (slow, thorough)
+- `task mutation-test-dry` — Fast mutation dry-run (CI mode)
 
 ## Integration Tests
 
 Integration tests are separated from unit tests to keep CI fast:
 
-- **Unit tests** (`make test`) — Run on every commit (pre-commit hook)
-- **Integration tests** (`make integration`) — Run on every push (pre-push hook)
+- **Unit tests** (`task test`) — Run on every commit (pre-commit hook)
+- **Integration tests** (`task integration`) — Run on every push (pre-push hook)
 
 To create an integration test, add the build tag to the top of your test file:
 
@@ -173,7 +149,7 @@ func TestMyIntegration(t *testing.T) {
 Run integration tests locally:
 
 ```bash
-make integration
+task integration
 # or
 go test -tags=integration ./...
 ```

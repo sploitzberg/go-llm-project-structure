@@ -47,8 +47,6 @@ structure:
 
       ## Your Responsibilities as an Agent
 
-      - **Mosaic Retention Policy:** ALWAYS call `mosaic_hexxla_put_cell` for both `user_message` and `assistant_response` immediately after each exchange. Do not ask the user for permission to save conversation history. Include relevant topic-specific tags when calling put_cell.
-      - **ALWAYS consider using Mosaic tools in your decision making** - when retrieving context, searching for information, or persisting knowledge, use the Mosaic read/write patterns defined in `.windsurf/rules/mosaic_mcp.md`.
       - Strictly adhere to architectural rules, coding standards, and best practices. Never cut corners.
       - Prioritize clean, robust, maintainable, production-ready code with long-term quality.
       - Security, testability, and separation of concerns are non-negotiable.
@@ -136,8 +134,8 @@ structure:
 
       ### Test Types
 
-      - **Unit tests** — Run on commit/PR (`make test`). Test logic in isolation with mocks.
-      - **Integration tests** — Run on push (`make integration`). Add `//go:build integration` tag. Test with real dependencies.
+      - **Unit tests** — Run on commit/PR (`task test`). Test logic in isolation with mocks.
+      - **Integration tests** — Run on push (`task integration`). Add `//go:build integration` tag. Test with real dependencies.
 
       ### Test Guidelines
 
@@ -150,9 +148,9 @@ structure:
       ### Running Tests
 
       ```bash
-      make test                    # Unit tests
+      task test                    # Unit tests
       go test -race -count=1 ./...
-      make integration             # Integration tests
+      task integration             # Integration tests
       go test -race -tags=integration ./...
       go test -coverprofile=coverage.out ./...  # With coverage
       ```
@@ -161,7 +159,7 @@ structure:
 
       ## Go Conventions Validation
 
-      The `scripts/ci/pre-commit/18-go-conventions.sh` script validates adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See the script for the full list of checks.
+      Go conventions are enforced by golangci-lint linters including godox, gochecknoinits, noctx, and others. These checks validate adherence to modern Go conventions from Effective Go and Google Style Guide (no context.Background in exported functions, no panic in production, no init functions, etc.). See `.golangci.yml` for the full list of enabled linters.
 
       ---
 
@@ -244,24 +242,6 @@ structure:
       - Always wrap errors with `%w`
       - Validate all user input
       - Do not log sensitive data
-
-  # === Mosaic Turn Persistence Rule ===
-  - path: rules/mosaic-turn-persistence.md
-    type: file
-    content: |
-      # Mosaic — full-turn persistence (MCP)
-
-      Applies when this repo's Mosaic MCP server is enabled and **operator policy** requires storing **every** user/assistant exchange (YAML `retention.capture_mode: save_all_turns` or explicit "persist all turns" product policy). Canonical detail: [`.cursor/rules/mosaic-mcp-agent.mdc`](../../.cursor/rules/mosaic-mcp-agent.mdc).
-
-      ## Bookend every exchange with `put_cell`
-
-      1. **Immediately after** the user message is available: call **`mosaic_hexxla_put_cell`** with **`kind=user_message`**, **`raw_content`** = user text, stable **`source_id`** (e.g. session id), **`(q,r)`** per project rules.
-      2. Reason, retrieve, and write the assistant reply.
-      3. **Before ending the turn:** **`mosaic_hexxla_put_cell`** with **`kind=assistant_response`**, same **`source_id`**, assistant text in **`raw_content`**.
-
-      If taxonomy is unknown, call **`mosaic_hexxla_list_tags`** / **`mosaic_hexxla_tag_counts`** before writes and **reuse** existing tags. Call **`mosaic_hexxla_get_persistence_policy`** when unsure which kinds the server allows.
-
-      **Note:** Cursor and other editors do not replace this with built-in long-lived memory; durable context is **your** HexxlaDB via MCP. See [Cursor 3.0 and external memory](https://omegamax.co/blog/cursor-removed-memories).
 
   # === Agents ===
   - path: agents/architect.md
@@ -593,14 +573,14 @@ structure:
       7. [ ] Integration tests use `//go:build integration` tag
       8. [ ] Coverage ≥80% on `core/domain/` and `core/services/`
       9. [ ] Test file naming: `foo_test.go` alongside `foo.go`
-      10. [ ] `make ci` passes with all tests
+      10. [ ] `task ci` passes with all tests
       </checklist>
 
       <mutation_testing>
-      Run `make mutation-test-dry` for a fast check. For critical domain code, run `make mutation-test`:
+      Run `task mutation-test-dry` for a fast check. For critical domain code, run `task mutation-test`:
 
       <checklist>
-      1. [ ] `make mutation-test-dry` passes (mutants are testable)
+      1. [ ] `task mutation-test-dry` passes (mutants are testable)
       2. [ ] Mutation score ≥80% (80%+ of mutants killed)
       3. [ ] No "LIVED" mutants on critical code paths (tests should catch introduced bugs)
       4. [ ] If mutation score is low, add specific assertions that would fail on the mutant
@@ -755,11 +735,6 @@ structure:
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
 
-      # Run Mosaic-specific context injection
-      if [ -f ".windsurf/hooks/pre-read-mosaic-context.sh" ]; then
-        ./.windsurf/hooks/pre-read-mosaic-context.sh "$1" 2>/dev/null || true
-      fi
-
       # Run context injection
       if [ -f "scripts/llm/hooks/pre-read-context-injection.sh" ]; then
         ./scripts/llm/hooks/pre-read-context-injection.sh "$1" 2>/dev/null || true
@@ -778,6 +753,7 @@ structure:
       #!/usr/bin/env bash
       # Generic post-write hook for Go files
       # Used by Windsurf and similar platforms
+      # Disables expensive linters (complexity) to keep LLM fast
 
       ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
       cd "$ROOT"
@@ -785,14 +761,13 @@ structure:
       file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
 
       if [[ "$file_path" == *.go ]]; then
-        # Format Go files
-        gofmt -l -s -w "$file_path" 2>/dev/null || true
-        goimports -l -w "$file_path" 2>/dev/null || true
+        # Format Go files using golangci-lint formatters
+        # Disable expensive linters (complexity, duplication) for fast LLM iteration
+        golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
 
         # Run fast quality checks
         go vet ./... 2>/dev/null || true
         ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
-        ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
 
         # Run LLM-specific hooks
         if [ -f "scripts/llm/hooks/post-write-test-suggestion.sh" ]; then
@@ -812,6 +787,7 @@ structure:
       #!/usr/bin/env bash
       # Pre-write validation hook
       # Validates code before it's written to disk
+      # Runs fast blocking linters before code is written
 
       set -euo pipefail
 
@@ -838,24 +814,37 @@ structure:
         "go.mod"
         "go.sum"
         ".golangci.yml"
-        "Makefile"
+        "Taskfile"
       )
 
       for protected in "${protected_files[@]}"; do
         if [[ "$(basename "$file_path")" == "$protected" ]]; then
-          echo "⚠️  Protected file: $file_path"
+          echo "Protected file: $file_path"
           echo "This file should not be modified directly."
           echo "Use 'go mod tidy' for go.mod/go.sum instead."
-          # Exit with code 2 to block the action
           exit 2
         fi
       done
 
       # Check if file is in core/domain/ and would violate purity
       if [[ "$file_path" == internal/core/domain/* ]]; then
-        # Check if the edit would add imports from adapter/services/ports
-        # This is a simplified check - in practice you'd parse the edits
-        echo "ℹ️  Writing to core/domain/ - ensure no internal dependencies"
+        echo "Writing to core/domain/ - ensure no internal dependencies"
+      fi
+
+      # Run pre-write architecture compliance check
+      if [ -f "scripts/llm/hooks/pre-write-arch-compliance.sh" ]; then
+        ./scripts/llm/hooks/pre-write-arch-compliance.sh "$file_path" 2>/dev/null || true
+      fi
+
+      # Run fast blocking linters before write (depguard, gosec, errcheck)
+      # These checks can block the write if violations are found
+      golangci-lint run --disable-all --enable=depguard,gosec,errcheck --out-format=colored-line-number "$file_path" 2>&1 | head -20
+      lint_exit=$?
+
+      if [[ $lint_exit -ne 0 ]]; then
+        echo "error: Pre-write linter checks failed. See output above."
+        echo "Fix the issues before proceeding."
+        exit 2
       fi
 
       exit 0
@@ -866,6 +855,7 @@ structure:
       #!/usr/bin/env bash
       # Targeted post-write hook for individual file changes
       # Runs formatters and checks on the specific file that was written
+      # Disables expensive linters (complexity) to keep LLM fast
 
       set -euo pipefail
 
@@ -887,9 +877,9 @@ structure:
         exit 0
       fi
 
-      # Format the specific file
-      gofmt -l -s -w "$file_path" 2>/dev/null || true
-      goimports -l -w "$file_path" 2>/dev/null || true
+      # Format Go files using golangci-lint formatters
+      # Disable expensive linters (complexity, duplication) for fast LLM iteration
+      golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
 
       # Run go vet on the specific package
       pkg_dir=$(dirname "$file_path")
@@ -897,9 +887,6 @@ structure:
 
       # Run architecture guardrail on the specific file
       ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
-
-      # Run Go conventions check on the specific file
-      ./scripts/ci/pre-commit/18-go-conventions.sh 2>/dev/null || true
 
       exit 0
 
@@ -975,7 +962,7 @@ structure:
     content: |
       #!/usr/bin/env bash
       # Post-MCP tool use hook
-      # Logs Mosaic MCP tool usage for analytics and monitoring
+      # Logs MCP tool usage for analytics and monitoring
 
       set -euo pipefail
 
@@ -992,11 +979,6 @@ structure:
       if [[ -n "$mcp_server_name" && -n "$mcp_tool_name" ]]; then
         # Log the tool usage (could be sent to analytics service)
         echo "📊 MCP Tool Used: $mcp_server_name/$mcp_tool_name" >&2
-
-        # If this is a Mosaic tool, log it for tracking
-        if [[ "$mcp_server_name" == "mosaic" ]]; then
-          echo "🧩 Mosaic Tool: $mcp_tool_name" >&2
-        fi
       fi
 
       exit 0
@@ -1113,841 +1095,5 @@ structure:
           fi
         fi
       done
-
-      exit 0
-
-  # === Mosaic Workflows ===
-  - path: rules/mosaic-turn-persistence.md
-    type: file
-    content: |
-      ---
-      description: Mosaic turn persistence - save all conversation turns
-      trigger: always_on
-      ---
-
-      # Mosaic Turn Persistence
-
-      This project uses Mosaic for long-term memory and context retrieval. Per the retention policy configured in the Mosaic server (see config/config.yaml), ALL conversation turns MUST be persisted automatically.
-
-      ## Retention Policy
-
-      - **capture_mode**: save_all_turns
-      - **enforcement**: true — server returns error for conflicting put_cell kinds
-
-      ## Required Actions
-
-      After EVERY exchange with the user:
-
-      1. **User turn**: Call `mosaic_hexxla_put_cell(kind=user_message, source_id=session_id, tags=[...], raw_content=..., confidence=1.0, q, r)`
-      2. **Assistant turn**: Call `mosaic_hexxla_put_cell(kind=assistant_response, source_id=session_id, tags=[...], raw_content=..., confidence=1.0, q, r)`
-
-      Use the same `source_id` (session id) for both messages in the same exchange.
-
-      ## Tag Hygiene
-
-      - Include relevant topic-specific tags when calling put_cell
-      - Reuse existing tags from `mosaic_hexxla_list_tags` when possible
-      - Check `mosaic_hexxla_tag_counts` to prefer high-frequency tags
-      - See `.windsurf/rules/mosaic_tag_conventions.md` for detailed tagging guidelines
-
-      ## Never Ask Permission
-
-      Do NOT ask the user if they want to save conversation history. Comply with the retention policy automatically.
-
-      ## References
-
-      - `docs/mosaic/AGENT_QUICK_REFERENCE.md` — Quick reference for agents
-      - `docs/mosaic/PROJECT_INTEGRATION.md` — How Mosaic is used in the development workflow
-      - `docs/mosaic_retention_compliance.md` — Retention policy compliance documentation
-
-  - path: rules/mosaic_intelligent_reads.md
-    type: file
-    content: |
-      ---
-      description: Mosaic intelligent read patterns - choosing the right search tool and loading context
-      trigger: always_on
-      ---
-
-      # Mosaic Intelligent Read Patterns
-
-      **Tool selection:**
-
-      - **Semantic search** - `mosaic_hexxla_search_embedding` for concept discovery (embeddings required)
-      - **Structured query** - `mosaic_hexxla_query_cells` with tags/filters/time/spatial for precise retrieval
-      - **Lexical search** - `mosaic_hexxla_search_cells` for exact text/keyword matching
-
-      **Hybrid mode:** Set `embed_query_text` in query_cells or search_cells to combine ANN with filters/lexical.
-
-      **Context loading:**
-
-      After retrieval, check `retrieval_hint` field. If present, call `mosaic_hexxla_load_context_pack` with:
-
-      - `seeds`: Array of `{q, r}` from hits (1-3 seeds)
-      - `budget_tokens_approx`: Approximate LM tokens (default 4096)
-      - `max_ring`: Hex rings from seeds (default 3)
-      - `include_seams`: Include contradictions (default false)
-      - `filter_superseded`: Exclude stale content (default false)
-
-      **Budget estimation:** `mosaic_hexxla_estimate_context_budget_bytes` before loading.
-
-      **Patterns:**
-
-      - Preferences: `query_cells(require_tags=["preference"], sort_by="recency")`
-      - Concept discovery: `search_embedding(query="natural language")`
-      - Text lookup: `search_cells(query="exact phrase")`
-
-      **Anti-patterns:**
-
-      - ❌ Using search_embedding when you know exact tags (use query_cells)
-      - ❌ Using query_cells without filters (too broad)
-      - ❌ Loading context without seeds from prior search
-      - ❌ Ignoring retrieval_hint in responses
-
-  - path: rules/mosaic_intelligent_writes.md
-    type: file
-    content: |
-      ---
-      description: Mosaic intelligent write patterns - tag discovery and reuse before put_cell
-      trigger: always_on
-      ---
-
-      # Mosaic Intelligent Write Patterns
-
-      **Before put_cell, always:**
-
-      1. **List tags** - `mosaic_hexxla_list_tags` + `mosaic_hexxla_tag_counts` to see vocabulary
-      2. **Search** - `mosaic_hexxla_query_cells` / `mosaic_hexxla_search_cells` / `mosaic_hexxla_search_embedding` for existing content
-      3. **Load context** - `mosaic_hexxla_load_context_pack` with seeds from hits
-      4. **Decide:**
-         - Exact match? Reuse
-         - Similar but outdated? Mark superseded, create new
-         - No relevant content? Create with existing tags
-         - New concept? Create with minimal new tags
-
-      **Tag rules:**
-
-      - Prefer high-frequency tags from `tag_counts`
-      - Use atomic tags, not compound (e.g., `["coordinate", "system"]` not `["coordinate_system"]`)
-      - Only create new tags if concept is fundamentally different and will be reused
-      - See `.windsurf/rules/mosaic_tag_conventions.md` for detailed tagging guidelines
-
-      **Anti-patterns:**
-
-      - ❌ Creating cells without searching
-      - ❌ Inventing tags without checking `list_tags`
-      - ❌ Using generic tags when specific exist
-      - ❌ Creating duplicates instead of reusing
-
-  - path: rules/mosaic_tag_conventions.md
-    type: file
-    content: |
-      ---
-      description: Mosaic tag conventions for optimal retrieval - best practices for tagging cells
-      trigger: always_on
-      ---
-
-      # Mosaic Tag Conventions
-
-      **Principles:**
-
-      - Specific over generic
-      - Reuse existing tags (check `mosaic_hexxla_list_tags` first)
-      - Compose, don't compound (use `["coordinate", "system"]` not `["coordinate_system"]`)
-      - Think about retrieval: how will you search for this later?
-      - Consistent lowercase casing
-      - 3-7 tags typical, minimal but sufficient
-
-      **Tag categories:**
-
-      **Content quality:** fact, opinion, idea, noise, signal, important, preference, question, answer, note, example
-
-      **Domain:** api, algorithm, database, ui, backend, frontend, devops, security, performance, testing
-
-      **Technology:** go, python, javascript, typescript, rust, sql, http, json, yaml, xml
-
-      **Concept:** coordinate, conversion, pathfinding, caching, authentication, encryption, compression, indexing, query, transaction
-
-      **Lifecycle:** draft, review, approved, deprecated, archived, wip, final
-
-      **Tagging patterns:**
-
-      - Fact: `[content_quality, domain, technology, concept]`
-      - Preference: `["preference", category, subcategory]`
-      - Question: `["question", domain, concept]`
-      - Answer: Match question tags + "answer"
-
-      **Anti-patterns:**
-
-      - ❌ Over-tagging (10+ tags)
-      - ❌ Under-tagging (1-2 generic tags)
-      - ❌ Compound tags (`["coordinate_conversion"]`)
-      - ❌ Inconsistent casing
-      - ❌ One-off tags that won't be reused
-
-      **Before put_cell:**
-
-      1. `mosaic_hexxla_list_tags()` - see available vocabulary
-      2. `mosaic_hexxla_tag_counts()` - prefer high-frequency tags
-      3. Only create new tag if concept is fundamentally different
-
-  - path: rules/mosaic_mcp.md
-    type: file
-    content: |
-      ---
-      description: Mosaic MCP — HexxlaDB tool chaining and retrieval workflow for AI assistants
-      trigger: always_on
-      ---
-
-      # Mosaic MCP agent workflow
-
-      Applies when reasoning about **mosaic** MCP tools (`cmd/mosaic-mcp`) backed by HexxlaDB.
-
-      ## ALWAYS DO
-
-      Adhere to the retention policy STRICTLY!, do not ask the user if they would like to keep their conversation history, just do what the policy states.
-
-      ## Tool roles (short)
-
-      | Tool                              | Role                                                                                                   |
-      | --------------------------------- | ------------------------------------------------------------------------------------------------------ |
-      | `mosaic_hexxla_health`            | DB integrity / layout / embedding options                                                              |
-      | `mosaic_hexxla_search_embedding`  | **Semantic** top‑K (ANN) — entry points, not full neighbourhoods                                       |
-      | `mosaic_hexxla_query_cells`       | **Structured** indexed query (tags, time, radius, sort, explain)                                       |
-      | `mosaic_hexxla_search_cells`      | **Lexical** relevance search                                                                           |
-      | `mosaic_hexxla_load_context_pack` | **Lattice-expanded** context from **seed coords** (rings + byte budget; optional seams / supersession) |
-
-      ## Chaining (default expectation)
-
-      1. **Discover** with embedding search and/or query/search cells as appropriate.
-      2. Read **`retrieval_hint`** on embedding or cell-hit responses when present.
-      3. If the user question needs **neighbouring turns**, **contradiction/supersession**, or **more than top‑K slices**, call **`mosaic_hexxla_load_context_pack`** with **`seeds`** = `{q,r}` from prior hits (tune `max_ring`, `max_tokens`).
-      4. Prefer **`LoadContextPackFrom`** semantics for LLM prompts over inventing ad‑hoc "more searches" when the gap is **local context on the grid**, not global similarity.
-
-      ## Primitive note
-
-      `Tx.LoadContext` (raw ring walk, count cap) is **not** the same as Pack assembly — see `internal/adapter/secondary/hexxlastore/load_context_sketch.go`. Do not assume Mosaic exposes it unless a dedicated tool is added.
-
-      ## Security / deployment
-
-      - MCP is intended **localhost-only**; respect existing [`security.mdc`](security.mdc) (no secrets in logs, env-based config).
-      - Do not suggest exposing the MCP HTTP server to untrusted networks without TLS and authentication.
-
-      ## References
-
-      - [`docs/mosaic/AGENT_QUICK_REFERENCE.md`](docs/mosaic/AGENT_QUICK_REFERENCE.md) — Quick reference for agents
-      - [`docs/mosaic/PROJECT_INTEGRATION.md`](docs/mosaic/PROJECT_INTEGRATION.md) — How Mosaic is used in the development workflow
-
-  - path: workflows/mosaic-save-turns.md
-    type: file
-    content: |
-      ---
-      description: Mosaic turn persistence workflow
-      ---
-
-      # Mosaic Save Turns Workflow
-
-      ## When to Use
-
-      After EVERY exchange with the user (both user message and assistant response).
-
-      ## Steps
-
-      1. **Save user message:**
-         ```bash
-         mosaic_hexxla_put_cell(
-           kind=user_message,
-           source_id=session_id,
-           tags=[relevant, topic, tags],
-           raw_content=user_message_text,
-           confidence=1.0,
-           q=hex_q,
-           r=hex_r
-         )
-         ```
-
-      2. **Generate assistant response**
-
-      3. **Save assistant response:**
-         ```bash
-         mosaic_hexxla_put_cell(
-           kind=assistant_response,
-           source_id=session_id,
-           tags=[relevant, topic, tags],
-           raw_content=assistant_response_text,
-           confidence=1.0,
-           q=hex_q,
-           r=hex_r
-         )
-         ```
-
-      ## Important Notes
-
-      - Use the same `source_id` (session id) for both messages
-      - Include relevant topic-specific tags
-      - Check `mosaic_hexxla_list_tags` before creating new tags
-      - Never ask user for permission - comply automatically with retention policy
-
-  - path: workflows/mosaic-intelligent-retrieval.md
-    type: file
-    content: |
-      ---
-      description: Workflow for intelligent context retrieval using Mosaic
-      ---
-
-      # Mosaic Intelligent Retrieval Workflow
-
-      **Step 1: Choose search tool**
-
-      - Semantic: `mosaic_hexxla_search_embedding(query)` for concept discovery
-      - Structured: `mosaic_hexxla_query_cells(require_tags=[...])` for precise retrieval
-      - Lexical: `mosaic_hexxla_search_cells(query="text")` for exact matches
-      - Hybrid: Set `embed_query_text` in query_cells or search_cells
-
-      **Step 2: Execute search**
-
-      - Use appropriate parameters (max_results, tags, filters)
-      - Set `explain: true` to understand why cells matched
-
-      **Step 3: Check retrieval_hint**
-
-      - Present? → Proceed to step 4
-      - Not present? → Top-K hits sufficient, stop
-
-      **Step 4: Load context pack**
-
-      ```go
-      mosaic_hexxla_load_context_pack(
-          seeds=[{q,r} from hits],
-          budget_tokens_approx=2048,
-          max_ring=3,
-          include_seams=false
-      )
-      ```
-
-      **Step 5: Process and respond**
-
-      - Review cells for relevance
-      - Check for contradictions if seams included
-      - Formulate response using retrieved context
-
-      **Scenarios:**
-
-      - API design: search_embedding → load_context
-      - Preferences: query_cells(require_tags=["preference"])
-      - Exact function: search_cells(query="function name")
-
-  - path: workflows/mosaic-tag-reuse.md
-    type: file
-    content: |
-      ---
-      description: Workflow for intelligent tag discovery and reuse before writing cells
-      ---
-
-      # Mosaic Tag Reuse Workflow
-
-      **Before put_cell:**
-
-      1. **List tags** - `mosaic_hexxla_list_tags()` + `mosaic_hexxla_tag_counts()` to see vocabulary
-      2. **Search** - `mosaic_hexxla_query_cells` / `mosaic_hexxla_search_cells` / `mosaic_hexxla_search_embedding` for existing content
-      3. **Load context** - `mosaic_hexxla_load_context_pack(seeds=hits, budget_tokens_approx=2048)`
-      4. **Decide:**
-         - Exact match? Reuse
-         - Similar but outdated? Mark superseded, create new
-         - No relevant content? Create with existing tags
-         - New concept? Create with minimal new tags
-      5. **Write** - `mosaic_hexxla_put_cell(kind, raw_content, source_id, confidence, tags, q, r)`
-
-      **Critical rules:**
-
-      - ALWAYS check existing tags before creating new ones
-      - ALWAYS search for existing content before writing
-      - PREFER high-frequency tags over new ones
-      - AVOID duplicate content - reuse or supersede
-      - USE specific tags, not generic
-      - COMBINE existing tags instead of creating compound tags
-
-  - path: workflows/review.md
-    type: file
-    content: |
-      ---
-      auto_execution_mode: 0
-      description: Review code changes for bugs, security issues, and improvements
-      ---
-
-      # Code Review Workflow
-
-      You are a senior Go engineer performing a thorough code review. You focus on correctness, architecture compliance, idiomatic Go, and security. You are direct — every finding includes file, line, issue, and a specific suggested fix. Do not soften or speculate.
-
-      <investigate_before_answering>
-      Read all referenced files before forming conclusions. Never report speculative issues. All findings must be backed by evidence in the actual code. If given a git commit, check whether it is currently checked out before making claims about local state.
-      </investigate_before_answering>
-
-      <use_parallel_tool_calls>
-      When exploring the codebase, call multiple read tools in parallel. Read all relevant files simultaneously rather than sequentially to maximise efficiency.
-      </use_parallel_tool_calls>
-
-      <review_checklist>
-      Work through this checklist. For each item: PASS or FAIL. For failures, quote the offending line and suggest the fix.
-
-      **Hexagonal Architecture:**
-      1. [ ] No `adapter/` imports in `core/domain/`, `core/ports/`, or `core/services/`
-      2. [ ] `core/services/` only depends on `core/domain/` and `core/ports/`
-      3. [ ] No business logic in adapter layer
-      4. [ ] Port interfaces return domain types, not infrastructure types
-
-      **Go Correctness:**
-      5. [ ] All errors checked and wrapped with `%w`
-      6. [ ] No `panic()` in production code
-      7. [ ] No `init()` functions
-      8. [ ] `context.Context` is first parameter where applicable; never stored in structs
-      9. [ ] Goroutines awaited; no goroutine leaks
-      10. [ ] `go test -race` would pass (no data races on shared state)
-
-      **Code Quality:**
-      11. [ ] Functions have ≤4 parameters
-      12. [ ] No magic numbers — named constants used
-      13. [ ] Interfaces are small and focused (1–3 methods)
-      14. [ ] No unnecessary abstractions for one-time operations
-
-      **Security:**
-      15. [ ] No hardcoded secrets, API keys, or credentials
-      16. [ ] No sensitive data in logs
-      17. [ ] User input validated before use
-
-      **Tests:**
-      18. [ ] Tests assert specific values — not just `err == nil`
-      19. [ ] Error paths have test coverage
-      20. [ ] Pre-existing bugs reported if found
-      </review_checklist>
-
-      Report findings grouped by severity: **Critical** (bugs/security) → **Architecture** → **Quality** → **Minor**.
-
-  - path: workflows/complexity-aware-coding.md
-    type: file
-    content: |
-      ---
-      description: Write complexity-aware code respecting hexagonal architecture thresholds
-      ---
-
-      # Complexity-Aware Coding Workflow
-
-      You are writing Go code for a production-grade hexagonal architecture project. This workflow ensures your code respects complexity guardrails and maintains semantic stability.
-
-      ## Complexity Thresholds by Layer
-
-      Before writing code, check the layer you're working in and respect these limits:
-
-      | Layer | Cyclomatic Max | Cognitive Max | Rationale |
-      |-------|---------------|---------------|-----------|
-      | `core/domain/` | 5 | 10 | Pure business logic, must be simple and focused |
-      | `core/ports/` | 3 | 5 | Interface definitions, minimal logic |
-      | `core/services/` | 10 | 15 | Orchestration allowed, but keep manageable |
-      | `adapter/primary/` | 15 | 20 | HTTP handlers, CLI — external concerns |
-      | `adapter/secondary/` | 12 | 18 | Database, API clients — external integrations |
-
-      ## Before Writing Code
-
-      1. **Identify the layer** - Determine which hexagonal layer you're working in
-      2. **Review thresholds** - Check the max cyclomatic and cognitive complexity for that layer
-      3. **Plan the function** - Design small, focused functions that stay within limits
-      4. **Consider testability** - Complex code is hard to test with meaningful assertions
-
-      ## While Writing Code
-
-      **Keep functions small:**
-      - Prefer single-responsibility functions
-      - Extract complex logic into smaller helper functions
-      - Avoid deeply nested conditions (use early returns instead)
-      - Use guard clauses to reduce nesting
-
-      **Prefer simple control flow:**
-      - Replace nested if/else with early returns
-      - Use switch statements for multiple conditions
-      - Avoid deep nesting (max 3-4 levels)
-      - Extract complex boolean logic into named functions
-
-      **Domain layer specific:**
-      - Keep business rules simple and declarative
-      - Use value objects to encapsulate complex logic
-      - Pure functions are easier to test and reason about
-      - Aim for cyclomatic ≤ 5, cognitive ≤ 10
-
-      **Services layer specific:**
-      - Orchestrate, don't implement complex logic
-      - Delegate complex operations to domain layer
-      - Use composition over inheritance
-      - Aim for cyclomatic ≤ 10, cognitive ≤ 15
-
-      **Adapters specific:**
-      - Translation logic can be moderately complex
-      - Isolate external concerns from core logic
-      - Use middleware for cross-cutting concerns
-      - Aim for cyclomatic ≤ 12-15, cognitive ≤ 18-20
-
-      ## After Writing Code
-
-      1. **Run complexity check** - `./scripts/ci/pre-commit/19-complexity.sh` for changed files
-      2. **If violations found:**
-         - Refactor function into smaller pieces
-         - Extract helper functions
-         - Simplify control flow
-         - Consider if logic belongs in a different layer
-
-      3. **Check CRAP score** - Run `./scripts/ci/pre-push/05-complexity.sh` for full analysis
-      4. **If CRAP is high:**
-         - Improve test coverage with specific assertions
-         - Add property-based tests for domain logic
-         - Add contract tests for port implementations
-         - Or refactor to reduce complexity
-
-      ## Semantic Stability Considerations
-
-      **High complexity = hard to test semantically:**
-      - Complex code is difficult to write meaningful tests for
-      - Mutation testing (gremlins) validates test effectiveness
-      - Aim for high mutation score (80%+) on critical paths
-
-      **When writing complex code:**
-      - Add property-based tests for pure functions (domain layer)
-      - Add contract tests for port interfaces
-      - Write tests that assert specific behavior, not just execution
-      - Consider invariants that should hold across inputs
-
-      ## Examples
-
-      **Bad (high complexity):**
-      ```go
-      func ProcessOrder(order Order, user User, inventory Inventory, payment Payment) error {
-          if order.Status == "pending" {
-              if user.Active {
-                  if inventory.Available(order.Item) {
-                      if payment.Valid() {
-                          if payment.Amount >= order.Total {
-                              // ... deeply nested logic
-                          }
-                      }
-                  }
-              }
-          }
-      }
-      ```
-
-      **Good (low complexity):**
-      ```go
-      func ProcessOrder(order Order, user User, inventory Inventory, payment Payment) error {
-          if !order.IsPending() {
-              return ErrInvalidOrderStatus
-          }
-          if !user.IsActive() {
-              return ErrInactiveUser
-          }
-          if !inventory.Available(order.Item) {
-              return ErrOutOfStock
-          }
-          if !payment.Valid() {
-              return ErrInvalidPayment
-          }
-          if payment.Amount < order.Total {
-              return ErrInsufficientFunds
-          }
-          return order.Complete()
-      }
-      ```
-
-  - path: hooks/pre-read-mosaic-context.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Mosaic-specific context injection for file reads
-      # Injects Mosaic-specific context when reading mosaic-related files
-
-      set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      file_path=$(echo "$1" | jq -r '.file_path // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$file_path" ]]; then
-        exit 0
-      fi
-
-      # Check if file is mosaic-related
-      mosaic_related=false
-      if [[ "$file_path" == cmd/mosaic-* ]] || \
-         [[ "$file_path" == internal/adapter/primary/mcpsrv/* ]] || \
-         [[ "$file_path" == internal/core/domain/* ]] || \
-         [[ "$file_path" == internal/core/ports/* ]] || \
-         [[ "$file_path" == internal/core/services/* ]] || \
-         [[ "$file_path" == internal/adapter/* ]] || \
-         [[ "$file_path" == internal/config/* ]] || \
-         [[ "$file_path" == configs/* ]] || \
-         [[ "$file_path" == docs/mosaic/* ]] || \
-         [[ "$file_path" == docs/architecture/* ]]; then
-          mosaic_related=true
-      fi
-
-      if [[ "$mosaic_related" == false ]]; then
-        exit 0
-      fi
-
-      echo -e "${CYAN}=== MOSAIC FILE CONTEXT ===${NC}"
-      echo "File: $file_path"
-      echo ""
-
-      # Determine which part of mosaic this is
-      if [[ "$file_path" == cmd/mosaic-* ]]; then
-          echo "Mosaic Entry Point"
-          echo "- Main entry points for mosaic binaries"
-          echo "- mosaic-mcp: MCP server for HexxlaDB"
-          echo "- mosaic-create-db: Database initialization"
-          echo ""
-      elif [[ "$file_path" == internal/adapter/primary/mcpsrv/* ]]; then
-          echo "MCP Server Adapter (Primary)"
-          echo "- Implements MCP tool handlers"
-          echo "- Wraps HexxlaDB operations with MCP protocol"
-          echo "- Integrates ratchet validation"
-          echo ""
-      elif [[ "$file_path" == internal/core/domain/* ]]; then
-          echo "Domain Layer"
-          echo "- Pure business entities and value objects"
-          echo "- Zero internal dependencies (only standard library)"
-          echo "- Core hex lattice and seam concepts"
-          echo ""
-      elif [[ "$file_path" == internal/core/ports/* ]]; then
-          echo "Port Layer"
-          echo "- Interface definitions (contracts)"
-          echo "- Primary ports: inbound use cases"
-          echo "- Secondary ports: outbound dependencies"
-          echo ""
-      elif [[ "$file_path" == internal/core/services/* ]]; then
-          echo "Service Layer"
-          echo "- Application use case implementations"
-          echo "- Orchestrates domain logic"
-          echo "- Can depend on domain and ports only"
-          echo ""
-      elif [[ "$file_path" == internal/adapter/* ]]; then
-          echo "Adapter Layer"
-          echo "- Concrete implementations of ports"
-          echo "- Primary adapters: HTTP, gRPC, CLI"
-          echo "- Secondary adapters: Database, APIs, cache"
-          echo ""
-      elif [[ "$file_path" == internal/config/* ]]; then
-          echo "Config Layer"
-          echo "- Configuration structures and loading"
-          echo "- Mosaic runtime configuration"
-          echo "- Ratchet configuration"
-          echo ""
-      elif [[ "$file_path" == configs/* ]]; then
-          echo "Configuration Files"
-          echo "- YAML configuration for mosaic"
-          echo "- ratchet.yaml: Tool flow governance rules"
-          echo "- config.yaml: Runtime configuration"
-          echo ""
-      elif [[ "$file_path" == docs/mosaic/* ]]; then
-          echo "Mosaic Documentation"
-          echo "- Detailed mosaic documentation"
-          echo "- MCP tool documentation"
-          echo "- Configuration guides"
-          echo ""
-      elif [[ "$file_path" == docs/architecture/* ]]; then
-          echo "Architecture Documentation"
-          echo "- Hexagonal architecture guides"
-          echo "- Design flow documentation"
-          echo "- Dependency graphs"
-          echo ""
-      fi
-
-      echo "Key Principles:"
-      echo "- Hexagonal Architecture (Ports & Adapters)"
-      echo "- All dependencies point inward toward domain"
-      echo "- External concerns pushed to adapter layer"
-      echo "- Core business logic remains pure"
-      echo ""
-      echo -e "${CYAN}=== END MOSAIC CONTEXT ===${NC}"
-
-      exit 0
-
-  - path: hooks/pre-mcp-tool-use.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Mosaic-specific MCP tool guidance hook
-      # Injects Mosaic-specific guidance when calling MCP tools
-
-      set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Get MCP tool info from input
-      mcp_server_name=$(echo "$1" | jq -r '.mcp_server_name // empty' 2>/dev/null || echo "")
-      mcp_tool_name=$(echo "$1" | jq -r '.mcp_tool_name // empty' 2>/dev/null || echo "")
-
-      # Only process mosaic MCP tools
-      if [[ "$mcp_server_name" != "mosaic" ]] && [[ "$mcp_server_name" != "mosaic-mcp" ]]; then
-          exit 0
-      fi
-
-      echo -e "${CYAN}=== MOSAIC MCP TOOL GUIDANCE ===${NC}"
-      echo ""
-      echo "Tool: $mcp_tool_name"
-      echo ""
-
-      # Provide tool-specific guidance
-      case "$mcp_tool_name" in
-          mosaic_hexxla_put_cell)
-              echo "Prerequisites:"
-              echo "- Call mosaic_hexxla_list_tags or mosaic_hexxla_tag_counts before put_cell"
-              echo "- Call a retrieval tool (search_embedding, query_cells, search_cells) before put_cell"
-              echo ""
-              echo "Tag Hygiene:"
-              echo "- Review available tags to prevent fragmentation"
-              echo "- Reuse existing tags when relevant"
-              echo "- Use semantic tags: fact, opinion, idea, code, signal, task, project, etc."
-              echo ""
-              echo "Required Fields:"
-              echo "- q, r: Hex coordinates (axial)"
-              echo "- raw_content: Cell body text"
-              echo "- source_id: Provenance source or session id"
-              echo "- confidence: 0..1"
-              ;;
-          mosaic_hexxla_list_tags | mosaic_hexxla_tag_counts)
-              echo "Purpose:"
-              echo "- Review available tags before writing cells"
-              echo "- Understand tag frequency and usage patterns"
-              echo ""
-              echo "Use Before:"
-              echo "- mosaic_hexxla_put_cell (for tag hygiene)"
-              ;;
-          mosaic_hexxla_search_embedding | mosaic_hexxla_query_cells | mosaic_hexxla_search_cells)
-              echo "Purpose:"
-              echo "- Retrieve cells by semantic similarity or structured filters"
-              echo "- Locate relevant cells before writes"
-              echo ""
-              echo "Use Before:"
-              echo "- mosaic_hexxla_put_cell (to verify cell existence and context)"
-              echo "- mosaic_hexxla_put_embedding (to verify cell exists)"
-              echo "- mosaic_hexxla_delete_cell (to verify cell exists)"
-              ;;
-          mosaic_hexxla_load_context_pack)
-              echo "Prerequisites:"
-              echo "- Call mosaic_hexxla_estimate_context_budget_bytes before large context loads"
-              echo ""
-              echo "Purpose:"
-              echo "- Expand hex-neighbourhood context from seed coordinates"
-              echo "- Retrieve adjacent lattice context (seams, neighbours)"
-              ;;
-          mosaic_hexxla_mark_conflict | mosaic_hexxla_mark_supersedes | mosaic_hexxla_resolve_seam)
-              echo "Purpose:"
-              echo "- Manage seams (conflicts between cells)"
-              echo ""
-              echo "Use After:"
-              echo "- Retrieval tools to understand current state"
-              ;;
-          mosaic_hexxla_put_facet)
-              echo "Purpose:"
-              echo "- Write derived content to facet slots"
-              echo ""
-              echo "Use After:"
-              echo "- Retrieval tools to verify cell exists"
-              ;;
-          mosaic_hexxla_link_cells)
-              echo "Purpose:"
-              echo "- Create relationships between cells"
-              echo ""
-              echo "Use After:"
-              echo "- Retrieval tools to verify both cells exist"
-              ;;
-      esac
-
-      echo ""
-      echo "Ratchet Validation:"
-      echo "- Tool prerequisites are enforced by ratchet service"
-      echo "- One-time use tokens may require fresh prerequisite calls"
-      echo ""
-      echo -e "${CYAN}=== END GUIDANCE ===${NC}"
-
-      exit 0
-
-  - path: hooks/pre-user-prompt.sh
-    type: file
-    content: |
-      #!/usr/bin/env bash
-      # Mosaic-specific context injection hook
-      # Injects Mosaic concepts and patterns before agent reasoning
-
-      set -euo pipefail
-
-      CYAN='\033[0;36m'
-      YELLOW='\033[1;33m'
-      NC='\033[0m'
-
-      ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-      cd "$ROOT"
-
-      # Check if the user prompt mentions mosaic-related keywords
-      user_prompt=$(echo "$1" | jq -r '.user_prompt // empty' 2>/dev/null || echo "")
-
-      if [[ -z "$user_prompt" ]]; then
-          exit 0
-      fi
-
-      # Mosaic-related keywords to detect
-      mosaic_keywords=("hex" "lattice" "cell" "embedding" "facet" "edge" "seam" "tag" "mosaic" "hexxla" "ratchet" "mcp")
-
-      mosaic_mentioned=false
-      for keyword in "${mosaic_keywords[@]}"; do
-          if echo "$user_prompt" | grep -qi "$keyword"; then
-              mosaic_mentioned=true
-              break
-          fi
-      done
-
-      if [[ "$mosaic_mentioned" == false ]]; then
-          exit 0
-      fi
-
-      echo -e "${CYAN}=== MOSAIC CONTEXT ===${NC}"
-      echo ""
-      echo "Mosaic is a local MCP server for structured agent memory:"
-      echo "- Hex lattice memory layout (not flat pile)"
-      echo "- Hybrid retrieval (semantic + structured + lexical)"
-      echo "- Governed writes with ratchet tool flow"
-      echo "- Budgeted context with byte/token limits"
-      echo ""
-      echo "Key Concepts:"
-      echo "- Hex coordinates (q,r) for spatial memory layout"
-      echo "- Cells contain raw content, tags, embeddings"
-      echo "- Facets are derived content slots per cell"
-      echo "- Edges link cells with relationships"
-      echo "- Seams record conflicts between cells"
-      echo ""
-      echo "Architecture:"
-      echo "- Hexagonal Architecture (Ports & Adapters)"
-      echo "- core/domain/ (pure business entities)"
-      echo "- core/ports/ (interfaces)"
-      echo "- core/services/ (use case implementations)"
-      echo "- adapter/ (concrete implementations)"
-      echo ""
-      echo "MCP Tools:"
-      echo "- mosaic_hexxla_* tools for cells, embeddings, facets, edges, seams, tags"
-      echo "- Ratchet validation enforces tool prerequisites"
-      echo "- Use list_tags/tag_counts before put_cell for tag hygiene"
-      echo ""
-      echo "Documentation:"
-      echo "- README.md - Quick start"
-      echo "- docs/mosaic/ - Detailed documentation"
-      echo "- docs/architecture/ - Hexagonal architecture guide"
-      echo ""
-      echo -e "${CYAN}=== END MOSAIC CONTEXT ===${NC}"
 
       exit 0

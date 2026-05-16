@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial project structure with hexagonal architecture (domain, port, service, adapter)
-- Makefile with common development targets
+- Taskfile with common development targets
 - CI pipeline with formatting, linting, tests, and architecture guardrails
 - Comprehensive documentation for each architectural layer
 
@@ -31,5 +31,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Standardized project layout for LLM-friendly hexagonal architecture templates
 
-[Unreleased]: https://github.com/sploitzberg/go-hexagonal-architecture-template/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/sploitzberg/go-hexagonal-architecture-template/releases/tag/v0.1.0
+[Unreleased]: https://github.com/sploitzberg/go-llm-project-structure/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sploitzberg/go-llm-project-structure/releases/tag/v0.1.0

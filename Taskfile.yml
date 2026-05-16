@@ -1,0 +1,200 @@
+# Taskfile for LLM Folder Bootstrap CLI
+# Replaces Makefile with Task (https://taskfile.dev)
+
+version: "3"
+
+vars:
+  BINARY_NAME: go-llm-project-structure
+  GOOS:
+    sh: go env GOOS
+  GOARCH:
+    sh: go env GOARCH
+  BINDIR: "bin/{{.GOOS}}-{{.GOARCH}}"
+  EXE: '{{if eq .GOOS "windows"}}.exe{{end}}'
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
+tasks:
+  default:
+    desc: Run full CI pipeline (same as GitHub Actions)
+    cmds:
+      - task: ci
+
+  build:
+    desc: Build the CLI binary for host OS
+    cmds:
+      - mkdir -p {{.BINDIR}}
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o {{.BINDIR}}/{{.BINARY_NAME}}{{.EXE}} ./cmd/go-llm-project-structure
+      - echo "  → {{.BINDIR}}/{{.BINARY_NAME}}{{.EXE}}"
+
+  build-linux:
+    desc: Cross-compile for linux/amd64
+    vars:
+      GOOS: linux
+      GOARCH: '{{.GOARCH | default "amd64"}}'
+    cmds:
+      - task: build
+        vars:
+          GOOS: "{{.GOOS}}"
+          GOARCH: "{{.GOARCH}}"
+
+  build-darwin:
+    desc: Cross-compile for darwin/amd64
+    vars:
+      GOOS: darwin
+      GOARCH: '{{.GOARCH | default "amd64"}}'
+    cmds:
+      - task: build
+        vars:
+          GOOS: "{{.GOOS}}"
+          GOARCH: "{{.GOARCH}}"
+
+  build-windows:
+    desc: Cross-compile for windows/amd64
+    vars:
+      GOOS: windows
+      GOARCH: '{{.GOARCH | default "amd64"}}'
+    cmds:
+      - task: build
+        vars:
+          GOOS: "{{.GOOS}}"
+          GOARCH: "{{.GOARCH}}"
+
+  build-all:
+    desc: Cross-compile for linux/darwin/windows (amd64)
+    cmds:
+      - task: build-linux
+      - task: build-darwin
+      - task: build-windows
+      - echo "==> Built all platforms into bin/"
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -race -count=1 ./...
+
+  test-all:
+    desc: Run both unit and integration tests
+    cmds:
+      - echo "Running unit tests..."
+      - go test -race -count=1 ./...
+      - echo ""
+      - echo "Running integration tests..."
+      - go test -race -count=1 -tags=integration ./...
+
+  integration:
+    desc: Run integration tests (slower, external dependencies)
+    cmds:
+      - go test -count=1 -race -tags=integration ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run --timeout=5m
+
+  fmt:
+    desc: Format code (now handled by golangci-lint formatters)
+    cmds:
+      - golangci-lint run --fix
+
+  ci:
+    desc: "Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
+    cmds:
+      - ./scripts/ci/ci.sh
+
+  llm-setup:
+    desc: Setup LLM tool configurations
+    cmds:
+      - ./scripts/llm/llm-setup.sh
+
+  clean-llm-cursor:
+    desc: Remove Cursor LLM tool configuration
+    cmds:
+      - rm -rf .cursor
+
+  clean-llm-claude:
+    desc: Remove Claude LLM tool configuration
+    cmds:
+      - rm -rf .claude
+
+  clean-llm-windsurf:
+    desc: Remove Windsurf LLM tool configuration
+    cmds:
+      - rm -rf .windsurf
+
+  clean-llm-continue:
+    desc: Remove Continue LLM tool configuration
+    cmds:
+      - rm -rf .continue
+
+  clean-llm-copilot:
+    desc: Remove Copilot LLM tool configuration
+    cmds:
+      - rm -rf .github/agents .github/skills .github/instructions 2>/dev/null || true
+
+  clean-llm-all:
+    desc: Remove all LLM tool configurations
+    cmds:
+      - rm -rf .cursor .claude .windsurf .continue .codex
+      - rm -rf .github/agents .github/skills .github/instructions 2>/dev/null || true
+
+  clean-llm:
+    desc: Remove all LLM tool configurations (alias)
+    cmds:
+      - task: clean-llm-all
+
+  install:
+    desc: Install the CLI locally
+    cmds:
+      - go install ./cmd/go-llm-project-structure
+
+  run:
+    desc: Run the CLI via go run
+    cmds:
+      - go run ./cmd/go-llm-project-structure
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf bin
+      - go clean
+
+  tidy:
+    desc: Run go mod tidy
+    cmds:
+      - go mod tidy
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  govulncheck:
+    desc: Vulnerability scan only
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  update:
+    desc: Update dependencies
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  mutation-test:
+    desc: Full mutation testing (slow, thorough)
+    vars:
+      TARGET: internal/core/domain
+    cmds:
+      - ./scripts/ci/pre-push/check-gremlins.sh {{.TARGET}}
+
+  mutation-test-dry:
+    desc: Fast mutation dry-run (CI mode)
+    vars:
+      TARGET: internal/core/domain
+    cmds:
+      - ./scripts/ci/pre-push/check-gremlins-dry.sh {{.TARGET}}
+
+  help:
+    desc: Display available tasks
+    cmds:
+      - task --list
