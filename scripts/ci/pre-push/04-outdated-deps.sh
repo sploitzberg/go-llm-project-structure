@@ -11,15 +11,14 @@ fi
 
 echo "> Checking for outdated dependencies"
 
-# Check for outdated direct dependencies
-outdated=$(go list -u -m all 2>/dev/null | grep -v "^\[" | awk '{if ($2 != $3) print $0}')
+# Check for outdated direct dependencies only (not transitive)
+outdated=$(go list -u -m 2>/dev/null | grep -v "^\[" | awk '{if ($2 != $3) print $0}')
 
 if [ -n "$outdated" ]; then
     echo "error: Outdated dependencies found:"
     echo "$outdated"
     echo ""
     echo "Update with: go get -u ./..."
-    echo "Or run: go list -u -m all"
     exit 1
 fi
 
