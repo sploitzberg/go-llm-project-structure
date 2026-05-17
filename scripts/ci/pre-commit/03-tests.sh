@@ -14,8 +14,8 @@ fi
 
 echo "> Running tests"
 
-# Use GO_TEST_FLAGS env var or default to -short for pre-commit
-GO_TEST_FLAGS="${GO_TEST_FLAGS:--short}"
+# Use GO_TEST_FLAGS env var or default to -race -count=1 for pre-commit
+GO_TEST_FLAGS="${GO_TEST_FLAGS:--race -count=1}"
 
 go test $GO_TEST_FLAGS ./...
 echo "Tests: OK"

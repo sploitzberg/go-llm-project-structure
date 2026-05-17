@@ -767,7 +767,7 @@ structure:
       if [[ "$file_path" == *.go ]]; then
         # Format Go files using golangci-lint formatters
         # Disable expensive linters (complexity, duplication) for fast LLM iteration
-        golangci-lint run --fix --fast --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
+        golangci-lint run --fix --disable=gocyclo,gocognit,funlen,dupl,testableexamples --config .golangci.yml "$file_path" 2>/dev/null || true
 
         # Run architecture guardrail only (per-file go vet runs in post_write_code)
         ./scripts/ci/hex-arch-guardrail.sh 2>/dev/null || true
@@ -840,8 +840,8 @@ structure:
       fi
 
       # Run fast blocking linters before write (depguard, gosec, errcheck)
-      # --fast ensures only fast linters run; plain output avoids ANSI color codes in LLM context
-      golangci-lint run --fast --disable-all --enable=depguard,gosec,errcheck --out-format=line-number "$file_path" 2>&1 | head -30
+      # Only fast linters enabled; plain output avoids ANSI color codes in LLM context
+      golangci-lint run --disable-all --enable=depguard,gosec,errcheck --out-format=line-number "$file_path" 2>&1 | head -30
       lint_exit=$?
 
       if [[ $lint_exit -ne 0 ]]; then

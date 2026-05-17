@@ -6,6 +6,5 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ../:/workspace:cached
-      - ~/.config/Windsurf:/home/vscode/.config/Windsurf
     command: sleep infinity
     network_mode: bridge

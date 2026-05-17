@@ -128,7 +128,7 @@ tasks:
       - ./scripts/llm/llm-setup.sh
 
   rename:
-    desc: Rename repository (update module path, URLs, and optional container name)
+    desc: "Rename repository: task rename -- github.com/<owner>/<repo>"
     cmds:
       - ./scripts/setup/rename-repo.sh {{.CLI_ARGS}}
 
