@@ -72,7 +72,7 @@ check_fanout() {
         | grep -v "^${MODULE}" \
         | grep -v "^std " \
         | grep -v "^$" \
-        | wc -l | tr -d ' ')
+        | wc -l | tr -d ' ' || true)
 
     if [[ "$fanout" -gt "$threshold" ]]; then
         echo "  FAIL [${layer_name}] fan-out=${fanout} exceeds max=${threshold}"
