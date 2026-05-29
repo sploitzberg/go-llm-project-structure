@@ -360,3 +360,33 @@ This project tracks fan-out (number of external packages imported) per hexagonal
 
 Use [pkg.go.dev](https://pkg.go.dev) for official Go package documentation. Visit `https://pkg.go.dev/<import-path>` for any package (e.g., https://pkg.go.dev/net/http). Check API docs before using unfamiliar packages to ensure idiomatic usage.
 </documentation>
+
+<shell_environment>
+
+## Shell: fish
+
+The USER's interactive shell is **fish**, not bash. fish has different syntax and some bash constructs do not work there.
+
+### Key differences to remember
+
+- **`$()` command substitution does not work in fish.** Fish uses `(command)` without the `$`. Never propose bare `$(...)` in fish commands.
+- **`^` is not a regex anchor in fish grep invocations typed at the prompt** — fish may interpret it as stderr redirect. Always quote patterns: `grep -v '^foo'` works when quoted.
+- **Bash scripts run fine** — the CI scripts (`scripts/ci/**/*.sh`) use `#!/usr/bin/env bash` and must be invoked via `bash scripts/ci/...sh`, not run directly in fish (direct execution picks the shebang, but `set -euo pipefail` bash-isms are fine inside the script).
+- **`task ci`** works correctly in fish because Task runs the scripts via `bash` internally.
+- **`2>&1` redirection works in fish.**
+- **`||` and `&&` work in fish** for chaining commands.
+
+### Diagnosing CI script failures in fish
+
+To debug a bash CI script in fish, run:
+
+```
+bash -x scripts/ci/path/to/script.sh
+```
+
+Do **not** use fish-specific syntax inside bash scripts. The scripts are bash and must stay bash.
+
+### Known fix applied
+
+`scripts/ci/pre-push/07-coupling.sh`: the `grep -v` pipeline inside `check_fanout` exited 1 when there were zero external dependencies (valid outcome), causing `set -e` to abort silently. Fixed by appending `|| true` to the pipeline.
+</shell_environment>
