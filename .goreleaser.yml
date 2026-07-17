@@ -1,6 +1,8 @@
 # .goreleaser.yml
 # GoReleaser configuration for automated releases
 
+version: 2
+
 project_name: go-llm-project-structure
 
 before:
@@ -23,11 +25,13 @@ builds:
     main: ./cmd/go-llm-project-structure
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"

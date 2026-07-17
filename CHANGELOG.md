@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated folder structure to clearly separate primary and secondary ports/adapters
 - Tailored the development container for Zed's native Go tooling
 - Updated agent workflows to use version-aware Go and token-efficient RTK skills
+- Updated Go, development tools, CI actions, and container images to current stable releases
 
 ### Removed
 

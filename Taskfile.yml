@@ -157,10 +157,15 @@ tasks:
     cmds:
       - go vet ./...
 
+  tools:
+    desc: Install the pinned tools required by local and hosted CI
+    cmds:
+      - bash scripts/setup/install-ci-tools.sh
+
   govulncheck:
     desc: Vulnerability scan only
     cmds:
-      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 
   update:
     desc: Update dependencies

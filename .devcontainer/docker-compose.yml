@@ -2,8 +2,8 @@ services:
   app:
     container_name: go-llm-project-structure
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
     volumes:
       - ../:/workspace:cached
     command: sleep infinity

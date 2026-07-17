@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 **Environment**
 
 - OS: [e.g. Linux, macOS, Windows]
-- Go version: [e.g. 1.26.2]
+- Go version: [e.g. 1.26.5]
 - Project version: [e.g. v0.1.0]
 
 **Additional context**

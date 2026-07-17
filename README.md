@@ -83,12 +83,12 @@ docker exec -it <container-name> bash
 
 ### Container includes
 
-- Go 1.26
-- golangci-lint
-- Task (task runner)
-- gopls and Delve for Zed's native Go tooling
-- Gremlins (mutation testing)
-- goda (dependency analysis)
+- Go 1.26.5
+- golangci-lint 2.12.2
+- Task 3.52.0 and RTK 0.43.0
+- gopls 0.23.0 and Delve 1.27.0
+- Gremlins 0.6.0
+- goda 0.9.4
 - Pre-configured git hooks
 
 ### Docker (Optional)
@@ -186,6 +186,7 @@ The Zed tasks call the same Taskfile and CI scripts used by local Git hooks and 
 - `task fmt` — Format code
 - `task ci` — Run full CI checks
 - `task install` — Install locally
+- `task tools` — Install pinned local/CI quality tools
 - `task mutation-test` — Full mutation testing with Gremlins (slow, thorough)
 - `task mutation-test-dry` — Fast mutation dry-run (CI mode)
 - `task benchmark` — Run benchmark tests

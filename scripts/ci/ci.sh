@@ -44,7 +44,7 @@ fi
 
 # CI-specific: vulnerability check
 echo "> Checking for known vulnerabilities"
-go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 
 # Run pre-push checks for CI
 echo "> Running pre-push checks"

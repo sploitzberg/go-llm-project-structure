@@ -23,8 +23,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	// #nosec G108 -- pprof is intentionally exposed for profiling (only with ENABLE_PPROF=true)
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108 -- pprof is intentionally exposed for profiling (only with ENABLE_PPROF=true)
 	"os"
 )
 
