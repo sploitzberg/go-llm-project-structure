@@ -85,10 +85,3 @@ __debug_bin.exe
 # Personal notes
 TODO.md
 NOTES.md
-
-# LLM tool configurations
-.cursor/
-.claude/
-.windsurf/
-.continue/
-.codex/

@@ -1,4 +1,4 @@
-# Taskfile for LLM Folder Bootstrap CLI
+# Taskfile for Go Project Bootstrap CLI
 # Replaces Makefile with Task (https://taskfile.dev)
 
 version: "3"
@@ -122,51 +122,14 @@ tasks:
     cmds:
       - ./scripts/ci/ci.sh
 
-  llm-setup:
-    desc: Setup LLM tool configurations
-    cmds:
-      - ./scripts/llm/llm-setup.sh
+
 
   rename:
     desc: "Rename repository: task rename -- github.com/<owner>/<repo>"
     cmds:
       - ./scripts/setup/rename-repo.sh {{.CLI_ARGS}}
 
-  clean-llm-cursor:
-    desc: Remove Cursor LLM tool configuration
-    cmds:
-      - rm -rf .cursor
 
-  clean-llm-claude:
-    desc: Remove Claude LLM tool configuration
-    cmds:
-      - rm -rf .claude
-
-  clean-llm-windsurf:
-    desc: Remove Windsurf LLM tool configuration
-    cmds:
-      - rm -rf .windsurf
-
-  clean-llm-continue:
-    desc: Remove Continue LLM tool configuration
-    cmds:
-      - rm -rf .continue
-
-  clean-llm-copilot:
-    desc: Remove Copilot LLM tool configuration
-    cmds:
-      - rm -rf .github/agents .github/skills .github/instructions 2>/dev/null || true
-
-  clean-llm-all:
-    desc: Remove all LLM tool configurations
-    cmds:
-      - rm -rf .cursor .claude .windsurf .continue .codex
-      - rm -rf .github/agents .github/skills .github/instructions 2>/dev/null || true
-
-  clean-llm:
-    desc: Remove all LLM tool configurations (alias)
-    cmds:
-      - task: clean-llm-all
 
   install:
     desc: Install the CLI locally

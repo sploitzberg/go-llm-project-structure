@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/sploitzberg/go-llm-project-structure/branch/main/graph/badge.svg)](https://codecov.io/gh/sploitzberg/go-llm-project-structure)
 
-A Go project template implementing strict **Hexagonal Architecture** (Ports & Adapters pattern) with LLM coding assistant tooling.
+A Go project template implementing strict **Hexagonal Architecture** (Ports & Adapters pattern) with first-class Zed IDE configuration.
 
 ## Quick Start
 
@@ -14,20 +14,18 @@ cd go-llm-project-structure
 # Install dependencies
 go mod download
 
-# Setup LLM tool configuration
-task llm-setup
+# Enable the version-controlled Git hooks
+git config core.hooksPath .githooks
 
-# Select your LLM provider (Cursor, Claude, Windsurf, Continue, Copilot, or Codex)
-# Sensible defaults are applied automatically
+# Open the project in Zed
+zed .
 
-# Run the application
-go run cmd/go-llm-project-structure/main.go
-
-# Run tests
+# Run the application or tests from Zed's task picker, or from the terminal
+task run
 task test
 ```
 
-That's it! Your LLM coding assistant now has comprehensive Go-specific rules, skills, agents, and hooks configured to enforce clean, production-ready, robust Go code following Hexagonal Architecture.
+Zed automatically loads the project tasks and Go settings from `.zed/`. Git hooks and CI enforce the same production-grade Go and Hexagonal Architecture guardrails outside the editor.
 
 ## Guardrails & CI/CD
 
@@ -41,7 +39,7 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 
 ### Code Quality Checks
 
-- **Formatting** - gofmt, goimports (auto-format on save via LLM hooks)
+- **Formatting** - gopls formatting on save in Zed, with gofmt and goimports enforced by CI
 - **Linting** - golangci-lint with comprehensive rule set
 - **Static Analysis** - go vet, gosec (security scanner)
 - **Error Wrapping** - Validates proper error handling with `%w`
@@ -66,21 +64,9 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 
 This project includes a Dev Container configuration for a consistent development environment.
 
-### Using Dev Container
+### Using the Dev Container
 
-**VS Code / VSCodium:**
-
-1. Install the "Dev Containers" extension
-2. Command Palette → "Dev Containers: Reopen in Container"
-3. First build takes 2-5 minutes (cached after)
-
-**Windsurf:**
-
-1. Command Palette → "Dev Containers: Reopen in Container"
-2. Note: Windsurf may show all parent folders in file explorer (known limitation)
-3. Container is functional despite this UI issue
-
-**Manual attachment (fallback):**
+The development container is optional and editor-independent. To start it manually:
 
 ```bash
 # Build and start container
@@ -100,7 +86,7 @@ docker exec -it <container-name> bash
 - Go 1.26
 - golangci-lint
 - Task (task runner)
-- jq, yq (YAML/JSON processors)
+- gopls and Delve for Zed's native Go tooling
 - Gremlins (mutation testing)
 - goda (dependency analysis)
 - Pre-configured git hooks
@@ -163,20 +149,27 @@ This project follows Hexagonal Architecture with these layers:
 - `internal/adapter/` — Concrete implementations (HTTP, database, etc.)
 - `internal/config/` — Configuration structures
 
-## LLM Platform Integration
+## Zed IDE Integration
 
-This project supports integration with various LLM platforms through platform-specific configuration files in `scripts/llm/platforms/`. These configurations provide:
+Project-scoped Zed configuration lives in `.zed/`:
 
-- Platform-specific hooks for context injection
-- Intelligent read/write patterns
-- Tag reuse conventions
+- [`tasks.json`](.zed/tasks.json) exposes build, test, lint, architecture, CI, formatting, integration, and run workflows through `task: spawn`.
+- [`settings.json`](.zed/settings.json) enables consistent gopls formatting on save.
+- [`.rules`](.rules) routes Zed agents to reusable project-local skills under `.agents/skills/`.
+- The [`use-rtk`](.agents/skills/use-rtk/SKILL.md) skill documents optional token-efficient command execution.
+- Zed provides native Go language-server, test runnable, and Delve integration; no editor lifecycle hooks or generated provider configuration are required.
+
+The Zed tasks call the same Taskfile and CI scripts used by local Git hooks and GitHub Actions, so editor workflows do not bypass repository guardrails. Verbose tasks prefer RTK when it is installed and otherwise execute the underlying command directly.
 
 ## Documentation
 
 - [`internal/README.md`](internal/README.md) — Layer responsibilities
 - [`internal/core/README.md`](internal/core/README.md) — Core architecture overview
 - [`docs/architecture/architecture.md`](docs/architecture/architecture.md) — Visual dependency graph
-- [`AGENTS.md`](AGENTS.md) — Instructions for AI coding assistants
+- [`AGENTS.md`](AGENTS.md) — Project invariants for coding assistants
+- [`.rules`](.rules) — Zed-specific skill routing and workflow rules
+- [`.agents/skills/`](.agents/skills/) — Reusable project-local agent skills
+- [`use-hexagonal-architecture`](.agents/skills/use-hexagonal-architecture/SKILL.md) — Inside-out architecture implementation and review workflow
 - [`docs/PROMPT_ENGINEERING.md`](docs/PROMPT_ENGINEERING.md) — Prompt engineering best practices with examples
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor code of conduct
@@ -193,7 +186,6 @@ This project supports integration with various LLM platforms through platform-sp
 - `task fmt` — Format code
 - `task ci` — Run full CI checks
 - `task install` — Install locally
-- `task llm-setup` — Setup LLM tool configurations
 - `task mutation-test` — Full mutation testing with Gremlins (slow, thorough)
 - `task mutation-test-dry` — Fast mutation dry-run (CI mode)
 - `task benchmark` — Run benchmark tests
@@ -206,7 +198,7 @@ This project supports integration with various LLM platforms through platform-sp
 Integration tests are separated from unit tests to keep CI fast:
 
 - **Unit tests** (`task test`) — Run on every commit (pre-commit hook)
-- **Integration tests** (`task integration`) — Run on every push (pre-push hook)
+- **Integration tests** (`task integration`) — Run explicitly and in the scheduled/manual integration workflow
 
 To create an integration test, add the build tag to the top of your test file:
 

@@ -1,0 +1,16 @@
+# Zed Agent Rules
+
+## Project-local skills
+
+Reusable agent workflows live under `.agents/skills/`. Before starting work, load a skill when its description matches the request. Skills supplement the project invariants in `AGENTS.md`; they do not replace or weaken them.
+
+- `.agents/skills/first-principles-engineering/SKILL.md` — use for non-trivial planning, architecture, implementation, debugging, and review.
+- `.agents/skills/use-hexagonal-architecture/SKILL.md` — use when designing, implementing, refactoring, or reviewing behavior across architectural layers.
+- `.agents/skills/use-modern-go/SKILL.md` — use when writing or reviewing Go code where language-version compatibility matters.
+- `.agents/skills/use-rtk/SKILL.md` — use before verbose read-only or validation commands when filtered output is sufficient.
+
+Keep detailed workflow instructions in the skill files rather than duplicating them in `.rules` or `AGENTS.md`.
+
+## RTK in Zed
+
+Zed has no dedicated `rtk init` target. Use the `use-rtk` skill and the checked-in `.zed/tasks.json` tasks, which prefer RTK when available and fall back to the underlying command. Use raw commands when full diagnostics are needed.

@@ -13,10 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Taskfile with common development targets
 - CI pipeline with formatting, linting, tests, and architecture guardrails
 - Comprehensive documentation for each architectural layer
+- Project-scoped Zed tasks and Go editor settings
+- Project-local Zed skill routing with Hexagonal Architecture and token-efficient RTK guidance
 
 ### Changed
 
 - Updated folder structure to clearly separate primary and secondary ports/adapters
+- Tailored the development container for Zed's native Go tooling
+- Updated agent workflows to use version-aware Go and token-efficient RTK skills
+
+### Removed
+
+- Legacy multi-platform LLM setup scripts, manifests, hooks, and Taskfile targets
 
 ## [0.1.0] - 2025-04-25
 

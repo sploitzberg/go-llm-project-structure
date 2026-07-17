@@ -1,0 +1,98 @@
+[
+  {
+    "label": "Go: Build",
+    "command": "sh",
+    "args": [
+      "-c",
+      "if command -v rtk >/dev/null 2>&1; then exec rtk task build; else exec task build; fi"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Go: Test All",
+    "command": "sh",
+    "args": [
+      "-c",
+      "if command -v rtk >/dev/null 2>&1; then exec rtk task test; else exec task test; fi"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Go: Test Current Package",
+    "command": "sh",
+    "args": [
+      "-c",
+      "if command -v rtk >/dev/null 2>&1; then exec rtk go test -race -count=1 .; else exec go test -race -count=1 .; fi"
+    ],
+    "cwd": "$ZED_DIRNAME",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Go: Integration Tests",
+    "command": "sh",
+    "args": [
+      "-c",
+      "if command -v rtk >/dev/null 2>&1; then exec rtk task integration; else exec task integration; fi"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Quality: Lint",
+    "command": "sh",
+    "args": [
+      "-c",
+      "if command -v rtk >/dev/null 2>&1; then exec rtk task lint; else exec task lint; fi"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Quality: Format",
+    "command": "task",
+    "args": ["fmt"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "Architecture: Validate",
+    "command": "bash",
+    "args": ["scripts/ci/hex-arch-guardrail.sh"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "on_success"
+  },
+  {
+    "label": "CI: Full Pipeline",
+    "command": "task",
+    "args": ["ci"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "never"
+  },
+  {
+    "label": "Go: Run",
+    "command": "task",
+    "args": ["run"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "save": "all",
+    "reveal": "always",
+    "hide": "never"
+  }
+]

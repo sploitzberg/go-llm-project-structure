@@ -1,29 +1,9 @@
 {
-  "name": "Go LLM Project Structure",
+  "name": "Go Hexagonal Project Structure",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
-  // Configure tool-specific properties
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "golang.go",
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
-        "eamodio.gitlens"
-      ],
-      "settings": {
-        "go.toolsManagement.checkForUpdates": "local",
-        "go.useLanguageServer": true,
-        "go.goroot": "/usr/local/go",
-        "go.gopath": "/home/vscode/go"
-      }
-    }
-  },
-  // Mount Windsurf config to persist chat history between host and container
-  "mounts": [
-    "source=${localEnv:HOME}/.config/Windsurf,target=/home/vscode/.config/Windsurf,type=bind"
-  ],
+
   // Use 'forwardPorts' to make a list of ports inside the container available locally
   "forwardPorts": [
     6060
