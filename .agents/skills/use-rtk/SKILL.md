@@ -60,11 +60,26 @@ rtk proxy go test -race -count=1 ./...
 rtk proxy git --no-pager diff
 ```
 
+## Preserve standard tool caches
+
+Run the repository's Taskfile commands without overriding cache environment variables. Do not set `GOCACHE`, `GOMODCACHE`, `GOPATH`, or `GOLANGCI_LINT_CACHE` to `/tmp` or a project-local directory solely to bypass the Zed terminal sandbox.
+
+Redirecting caches changes normal developer behavior, can force repeated module downloads, and creates large hash-sharded directory trees. In this environment `/tmp` may be cleared between terminal calls, so redirected caches are recreated instead of reused.
+
+When a command fails because the sandbox cannot write to a standard cache:
+
+1. Inspect the configured locations with read-only commands such as `go env GOCACHE GOMODCACHE GOPATH` and, when needed, `golangci-lint cache status`.
+2. Resolve those values to literal paths before making a tool call; do not use shell substitution in terminal commands.
+3. Request narrow filesystem write access to the existing standard cache directories. This commonly includes the Go build cache, module cache, checksum database under `GOPATH/pkg/sumdb`, and golangci-lint cache. Request `GOPATH/bin` only when an explicitly requested tool installation needs it.
+4. Rerun the original command unchanged, for example `task test`, `task lint`, or `CI=true task ci`. If downloading is required, request only the necessary network hosts separately.
+
+Do not persist sandbox-specific cache overrides in the Taskfile, scripts, editor settings, or documentation. If access to the standard cache is not granted, report the validation limitation instead of silently rerouting caches.
+
+Temporary directories remain appropriate for bounded fixtures and staged-index snapshots when they are cleaned with a reliable `trap`; they must not be used as long-lived compiler, module, or linter caches.
+
 ## Zed integration
 
 Zed has no dedicated `rtk init` target. Do not install another editor's hooks or settings as a substitute. The checked-in `.zed/tasks.json` tasks prefer RTK for appropriate commands and fall back to raw commands when RTK is absent.
-
-
 
 ## Meta commands
 
