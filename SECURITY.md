@@ -12,7 +12,7 @@ If you discover a security vulnerability, please report it privately to avoid ex
 
 **Do not open a public issue.**
 
-Instead, please send an email to: [security contact email]
+Instead, use [GitHub private vulnerability reporting](https://github.com/sploitzberg/go-llm-project-structure/security/advisories/new). If private reporting is unavailable, contact the repository owner through a private channel listed on their GitHub profile; do not include vulnerability details in a public issue.
 
 Please include:
 - A description of the vulnerability

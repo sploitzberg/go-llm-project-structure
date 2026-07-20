@@ -15,7 +15,7 @@ errors=0
 warnings=0
 
 # Find all exported types in domain
-domain_files=$(find internal/core/domain -name "*.go" 2>/dev/null || true)
+domain_files=$(find internal/core/domain -name "*.go" ! -name "*_test.go" 2>/dev/null || true)
 
 for file in $domain_files; do
     # Get exported types
@@ -26,7 +26,7 @@ for file in $domain_files; do
         if grep -q "^type $type struct" "$file"; then
             # Check if struct has unexported fields (this is OK for domain)
             # But warn if it has exported fields that might be implementation details
-            exported_fields=$(grep -A 20 "^type $type struct" "$file" | grep -E "^\s+[A-Z]" | awk '{print $1}' || true)
+            exported_fields=$(grep -A 20 "^type $type struct" "$file" | grep -E "^[[:space:]]+[A-Z]" | awk '{print $1}' || true)
 
             if [ -n "$exported_fields" ]; then
                 echo "warning: Domain struct $type in $file has exported fields: $exported_fields"

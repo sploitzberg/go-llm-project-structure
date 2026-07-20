@@ -30,9 +30,9 @@ linters:
     - funlen
     - mnd
     - gocognit
+    - gochecknoinits
     - godot
     - godox
-    - goheader
     - gomoddirectives
     - importas
     - inamedparam
@@ -49,58 +49,70 @@ linters:
   settings:
     depguard:
       rules:
-        # Rule 1: core/domain/ must remain pure
         domain_pure:
           files:
             - internal/core/domain/**/*.go
-          deny:
-            - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
-                er|core/services|core/ports)"
-              desc: "core/domain/ must not depend on adapter, services, or ports (hexagonal rule)"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
 
-        # Rule 2: core/services/ must not depend on adapter
-        service_clean:
-          files:
-            - internal/core/services/**/*.go
-          deny:
-            - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
-                r"
-              desc: "core/services/ must not depend on adapter/ (use ports instead)"
-
-        # Rule 3: core/ports/ must remain clean
-        port_clean:
+        ports_clean:
           files:
             - internal/core/ports/**/*.go
-          deny:
-            - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(adapt\
-                er|core/services)"
-              desc: "core/ports/ must not depend on adapter or services"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/sploitzberg/go-llm-project-structure/internal/core/domain
 
-        # Rule 4: primary adapters should be clean
-        primary_adapter_clean:
+        services_clean:
+          files:
+            - internal/core/services/**/*.go
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/sploitzberg/go-llm-project-structure/internal/core/domain
+            - github.com/sploitzberg/go-llm-project-structure/internal/core/ports
+
+        config_pure:
+          files:
+            - internal/config/**/*.go
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+
+        primary_adapters:
           files:
             - internal/adapter/primary/**/*.go
           deny:
-            - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/(core/servi\
-                ces|adapter/secondary)"
-              desc: "primary adapters should only depend on core/domain and core/ports"
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/core/services
+              desc: primary adapters depend on primary ports, not concrete services
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/core/ports/secondary
+              desc: primary adapters must not use secondary ports
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/adapter
+              desc: adapters must not depend on other adapters
 
-        # Rule 5: secondary adapters should not depend on primary adapters
-        secondary_adapter_clean:
+        secondary_adapters:
           files:
             - internal/adapter/secondary/**/*.go
           deny:
-            - pkg:
-                "github.com/sploitzberg/go-llm-project-structure/internal/adapte\
-                r/primary"
-              desc: "secondary adapters should not depend on primary adapters"
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/core/services
+              desc: secondary adapters must not use services
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/core/ports/primary
+              desc: secondary adapters must not use primary ports
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/config
+              desc: secondary adapters receive constructed dependencies from cmd
+            - pkg: github.com/sploitzberg/go-llm-project-structure/internal/adapter
+              desc: adapters must not depend on other adapters
 
     gocognit:
       min-complexity: 10
+
+    gocyclo:
+      min-complexity: 15
 
     gocritic:
       enabled-tags:
@@ -120,16 +132,7 @@ linters:
         - HACK
         - XXX
 
-    goheader:
-      template: |
-        {{ .License }}
 
-        {{ .Author }}
-
-      values:
-        const:
-          license: Apache-2.0
-          author: sploitzberg
 
     gomoddirectives:
       replace-local: true

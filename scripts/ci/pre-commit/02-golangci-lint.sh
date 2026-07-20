@@ -13,6 +13,6 @@ echo "> Running golangci-lint"
 # Use GOLANGCI_LINT_TIMEOUT env var or default to 2m for pre-commit
 TIMEOUT=${GOLANGCI_LINT_TIMEOUT:-2m}
 
-golangci-lint run --timeout="$TIMEOUT" --fix
+golangci-lint run --timeout="$TIMEOUT"
 echo "golangci-lint: OK"
 echo

@@ -54,10 +54,10 @@ func (e Email) Validate() error {
 
 // User is a domain entity representing a user in the system
 type User struct {
-    ID           UserID
-    Email        Email
-    PasswordHash string
-    IsActive     bool
+    ID       UserID
+    Email    Email
+    Name     string
+    IsActive bool
 }
 
 // Activate is a business rule - a user can only be activated once
@@ -146,9 +146,8 @@ type UserService interface {
 
 // RegisterUserCommand is a command object for user registration
 type RegisterUserCommand struct {
-    Email    domain.Email
-    Password string
-    Name     string
+    Email domain.Email
+    Name  string
 }
 ```
 
@@ -255,23 +254,24 @@ import (
     "errors"
 
     "github.com/myapp/internal/core/domain"
-    "github.com/myapp/internal/core/ports"
+    primaryport "github.com/myapp/internal/core/ports/primary"
+    secondaryport "github.com/myapp/internal/core/ports/secondary"
 )
 
-// UserServiceImpl implements the UserService port interface
+// UserServiceImpl implements the primary UserService port.
 type UserServiceImpl struct {
-    userRepo    port.UserRepository
-    emailSender port.EmailSender
+    userRepo    secondaryport.UserRepository
+    emailSender secondaryport.EmailSender
 }
 
-func NewUserService(userRepo port.UserRepository, emailSender port.EmailSender) *UserServiceImpl {
+func NewUserService(userRepo secondaryport.UserRepository, emailSender secondaryport.EmailSender) *UserServiceImpl {
     return &UserServiceImpl{
         userRepo:    userRepo,
         emailSender: emailSender,
     }
 }
 
-func (s *UserServiceImpl) Register(ctx context.Context, cmd port.RegisterUserCommand) (domain.User, error) {
+func (s *UserServiceImpl) Register(ctx context.Context, cmd primaryport.RegisterUserCommand) (domain.User, error) {
     // 1. Check if email exists (secondary port)
     exists, err := s.userRepo.ExistsByEmail(ctx, cmd.Email)
     if err != nil {
@@ -294,15 +294,19 @@ func (s *UserServiceImpl) Register(ctx context.Context, cmd port.RegisterUserCom
     }
 
     // 4. Send welcome email (secondary port)
-    s.emailSender.SendWelcomeEmail(ctx, user.Email)
+    if err := s.emailSender.SendWelcomeEmail(ctx, user.Email); err != nil {
+        return domain.User{}, err
+    }
 
     return user, nil
 }
+
+var _ primaryport.UserService = (*UserServiceImpl)(nil)
 ```
 
 ### Why fourth?
 
-- Pure business logic, easy to test with mocks
+- Use-case orchestration, easy to test with port fakes
 - Depends on domain and ports, which are already defined
 - Can be fully tested before choosing databases or frameworks
 
@@ -314,8 +318,8 @@ func (s *UserServiceImpl) Register(ctx context.Context, cmd port.RegisterUserCom
 
 ### What to do
 
-- Implement primary port interfaces for external requests
-- Implement secondary port interfaces for external systems
+- Make primary adapters call primary port interfaces for external requests
+- Make secondary adapters implement secondary port interfaces for external systems
 - Choose your technologies (HTTP framework, database, etc.)
 - Handle technical concerns (serialization, error mapping)
 
@@ -336,37 +340,41 @@ import (
     "net/http"
 
     "github.com/myapp/internal/core/domain"
-    "github.com/myapp/internal/core/ports"
+    primaryport "github.com/myapp/internal/core/ports/primary"
 )
 
 type HTTPUserHandler struct {
-    userService port.UserService
+    userService primaryport.UserService
 }
 
-func NewHTTPUserHandler(userService port.UserService) *HTTPUserHandler {
+func NewHTTPUserHandler(userService primaryport.UserService) *HTTPUserHandler {
     return &HTTPUserHandler{userService: userService}
 }
 
 type RegisterRequest struct {
-    Email    string `json:"email"`
-    Password string `json:"password"`
-    Name     string `json:"name"`
+    Email string `json:"email"`
+    Name  string `json:"name"`
 }
 
 func (h *HTTPUserHandler) Register(w http.ResponseWriter, r *http.Request) {
     var req RegisterRequest
-    json.NewDecoder(r.Body).Decode(&req)
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "invalid request", http.StatusBadRequest)
+        return
+    }
 
-    cmd := port.RegisterUserCommand{
-        Email:    domain.Email(req.Email),
-        Password: req.Password,
-        Name:     req.Name,
+    cmd := primaryport.RegisterUserCommand{
+        Email: domain.Email(req.Email),
+        Name:  req.Name,
     }
 
     user, err := h.userService.Register(r.Context(), cmd)
-    // Handle response...
-    _ = user // Use user
-    _ = err  // Handle error
+    if err != nil {
+        // Map application errors to the appropriate HTTP response.
+        http.Error(w, "registration failed", http.StatusInternalServerError)
+        return
+    }
+    _ = user // Encode the response DTO.
 }
 
 // internal/adapter/secondary/postgres_user_repository.go
@@ -377,7 +385,7 @@ import (
     "database/sql"
 
     "github.com/myapp/internal/core/domain"
-    "github.com/myapp/internal/core/ports"
+    secondaryport "github.com/myapp/internal/core/ports/secondary"
 )
 
 type PostgresUserRepository struct {
@@ -413,8 +421,8 @@ func (r *PostgresUserRepository) ExistsByEmail(ctx context.Context, email domain
     return exists, err
 }
 
-// Ensure PostgresUserRepository implements port.UserRepository
-var _ port.UserRepository = (*PostgresUserRepository)(nil)
+// Ensure PostgresUserRepository implements the secondary port.
+var _ secondaryport.UserRepository = (*PostgresUserRepository)(nil)
 ```
 
 ### Why last?
@@ -479,10 +487,21 @@ type UserServiceImpl struct {
 // Implements UserService interface (primary port)
 func (s *UserServiceImpl) Register(ctx context.Context, cmd RegisterUserCommand) (User, error) {
     // Coordinate: check email, create entity, call entity methods, save, send email
-    exists, _ := s.userRepo.ExistsByEmail(ctx, cmd.Email)
+    exists, err := s.userRepo.ExistsByEmail(ctx, cmd.Email)
+    if err != nil {
+        return User{}, err
+    }
+    if exists {
+        return User{}, ErrEmailAlreadyRegistered
+    }
+
     user := User{Email: cmd.Email, Name: cmd.Name}
-    s.userRepo.Save(ctx, &user)
-    s.emailSender.SendWelcomeEmail(ctx, user.Email)
+    if err := s.userRepo.Save(ctx, &user); err != nil {
+        return User{}, err
+    }
+    if err := s.emailSender.SendWelcomeEmail(ctx, user.Email); err != nil {
+        return User{}, err
+    }
     return user, nil
 }
 ```

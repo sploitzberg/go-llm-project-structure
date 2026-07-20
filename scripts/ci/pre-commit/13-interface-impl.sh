@@ -1,66 +1,27 @@
 #!/usr/bin/env bash
-# scripts/ci/pre-commit/13-interface-impl.sh
-# Validate that adapters implement required port interfaces
+# Compile adapter packages so explicit port implementation assertions are verified.
 
 set -euo pipefail
 
-echo "> Running interface implementation validation"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cd "$ROOT"
 
-# Find all adapter files
-adapter_files=$(find internal/adapter -name "*.go" 2>/dev/null || true)
+echo "> Validating adapter port contracts"
 
-if [ -z "$adapter_files" ]; then
-    echo "No adapter files found, skipping"
-    exit 0
-fi
-
-errors=0
-
-# Check each adapter file
-for file in $adapter_files; do
-    # Extract the package name from the adapter
-    adapter_pkg=$(grep -m1 "^package " "$file" | sed 's/package //')
-
-    # Look for struct definitions in adapter
-    structs=$(grep -E "^type [A-Z].* struct" "$file" | awk '{print $2}' || true)
-
-    for struct in $structs; do
-        # Get all methods defined for this struct
-        methods=$(grep -E "func \($struct \*?[A-Z]" "$file" | sed 's/.*func //' | sed 's/(.*//' || true)
-
-        # This is a basic check - in a real implementation, you'd parse the Go AST
-        # to verify the struct actually implements the interface it claims to
-        if [ -z "$methods" ]; then
-            echo "warning: Adapter struct $struct in $file has no methods"
-        fi
-    done
-done
-
-# Check that port interfaces are actually implemented by adapters
-port_interfaces=$(find internal/core/ports -name "*.go" -exec grep -l "^type.*interface" {} \; 2>/dev/null || true)
-
-for port_file in $port_interfaces; do
-    port_pkg=$(dirname "$port_file" | xargs basename)
-
-    # Find corresponding adapter directory
-    if [[ "$port_pkg" == "primary" ]]; then
-        adapter_dir="internal/adapter/primary"
-    elif [[ "$port_pkg" == "secondary" ]]; then
-        adapter_dir="internal/adapter/secondary"
-    else
-        continue
-    fi
-
-    if [[ ! -d "$adapter_dir" ]]; then
-        echo "error: Port interface in $port_file has no corresponding adapter directory: $adapter_dir"
-        errors=$((errors + 1))
-    fi
-done
-
-if ((errors > 0)); then
-    echo "error: Interface implementation validation failed with $errors error(s)"
+if ! command -v go >/dev/null 2>&1; then
+    echo "error: go not found" >&2
     exit 1
 fi
 
-echo "Interface implementation: OK"
+if ! find internal/adapter -type f -name '*.go' -print -quit 2>/dev/null | grep -q .; then
+    echo "No adapter packages found, skipping"
+    exit 0
+fi
+
+# The architecture guardrail requires each secondary-adapter package to contain
+# an assertion such as: var _ secondaryport.Repository = (*Repository)(nil).
+# Compiling the packages makes Go verify those explicit contracts.
+go test -run '^$' ./internal/adapter/...
+
+echo "Adapter port contracts: OK"
 echo

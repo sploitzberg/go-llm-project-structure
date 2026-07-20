@@ -21,23 +21,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"net/http"
-	_ "net/http/pprof" // #nosec G108 -- pprof is intentionally exposed for profiling (only with ENABLE_PPROF=true)
+	"io"
 	"os"
+
+	"github.com/sploitzberg/go-llm-project-structure/internal/adapter/primary/greetingcli"
+	"github.com/sploitzberg/go-llm-project-structure/internal/adapter/secondary/greetingmemory"
+	greetingservice "github.com/sploitzberg/go-llm-project-structure/internal/core/services/greeting"
 )
 
 func main() {
-	// Enable pprof profiling if ENABLE_PPROF is set
-	if os.Getenv("ENABLE_PPROF") == "true" {
-		go func() {
-			fmt.Println("Profiling enabled on http://localhost:6060")
-			// #nosec G114 -- pprof server without timeouts is acceptable for dev profiling
-			if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-				fmt.Printf("pprof server error: %v\n", err)
-			}
-		}()
+	if err := run(context.Background(), os.Args[1:], os.Stdout); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
+}
 
-	fmt.Println("Hello, World!")
+func run(ctx context.Context, arguments []string, output io.Writer) error {
+	recorder := greetingmemory.NewRecorder()
+	service := greetingservice.New(recorder)
+	if err := greetingcli.New(service).Run(ctx, arguments, output); err != nil {
+		return fmt.Errorf("run greeting CLI: %w", err)
+	}
+	return nil
 }

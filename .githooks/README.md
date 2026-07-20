@@ -10,3 +10,4 @@ Run the following command once after cloning the repository:
 
 ```bash
 git config core.hooksPath .githooks
+```

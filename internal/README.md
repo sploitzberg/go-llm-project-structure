@@ -4,12 +4,13 @@ This directory contains all private application code following **Hexagonal Archi
 
 ## Architecture Layers
 
-| Layer            | Responsibility                          | Can Depend On                 | Must Not Depend On           |
-| ---------------- | --------------------------------------- | ----------------------------- | ---------------------------- |
-| `core/domain/`   | Business entities and rules             | Nothing                       | Anything else                |
-| `core/ports/`    | Interfaces (contracts)                  | `core/domain/`                | `adapter/`, `core/services/` |
-| `core/services/` | Application use cases and orchestration | `core/domain/`, `core/ports/` | `adapter/`                   |
-| `adapter/`       | Concrete implementations                | `core/ports/`, `core/domain/` | Other adapters (mostly)      |
-| `config/`        | Configuration structures                | Nothing                       | -                            |
+| Layer                       | Project packages it may import                         | External packages |
+| --------------------------- | ------------------------------------------------------ | ----------------- |
+| `core/domain/`              | None                                                   | Standard library only |
+| `core/ports/`               | `core/domain/`                                         | Standard library only |
+| `core/services/`            | `core/domain/`, `core/ports/`                          | Standard library only |
+| `adapter/primary/`          | `core/domain/`, `core/ports/primary/`, `config/`       | Allowed |
+| `adapter/secondary/`        | `core/domain/`, `core/ports/secondary/`                | Allowed |
+| `config/`                   | None                                                   | Standard library only |
 
-**Core Rule**: All dependencies must point **inward** toward the `core/domain`.
+**Core Rule**: All dependencies must point inward. Adapters never import other adapters, and any new Go package under `internal/` requires an explicit architecture policy.

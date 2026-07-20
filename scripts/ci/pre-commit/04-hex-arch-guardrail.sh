@@ -6,8 +6,12 @@ set -euo pipefail
 
 echo "> Checking hexagonal architecture rules"
 
-if [[ -f ./scripts/ci/hex-arch-guardrail.sh ]]; then
-    ./scripts/ci/hex-arch-guardrail.sh
-else
-    echo "Warning: hex-arch-guardrail.sh not found (skipped)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GUARDRAIL="$SCRIPT_DIR/../hex-arch-guardrail.sh"
+
+if [[ ! -f "$GUARDRAIL" ]]; then
+    echo "error: required architecture guardrail not found: $GUARDRAIL" >&2
+    exit 1
 fi
+
+exec bash "$GUARDRAIL"

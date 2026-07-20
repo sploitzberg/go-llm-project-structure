@@ -30,7 +30,7 @@ ARG TARGETARCH
 # source code into the container.
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
-    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server ./cmd/go-llm-project-structure
+    CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/go-llm-project-structure ./cmd/go-llm-project-structure
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal
@@ -64,10 +64,7 @@ RUN adduser \
 USER appuser
 
 # Copy the executable from the "build" stage.
-COPY --from=build /bin/server /bin/
+COPY --from=build /bin/go-llm-project-structure /bin/
 
-# Expose the port that the application listens on.
-EXPOSE 8080
-
-# What the container should run when it is started.
-ENTRYPOINT [ "/bin/server" ]
+# Run the removable CLI example. Replace this entry point when bootstrapping a server.
+ENTRYPOINT [ "/bin/go-llm-project-structure" ]

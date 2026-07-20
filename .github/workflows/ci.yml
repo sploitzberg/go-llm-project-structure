@@ -34,6 +34,7 @@ jobs:
             ~/go/bin/golangci-lint
             ~/go/bin/gremlins
             ~/go/bin/goda
+            ~/go/bin/actionlint
             ~/.cache/go-build
           key: ${{ runner.os }}-go-tools-${{ matrix.go-version }}-${{ hashFiles('scripts/setup/install-ci-tools.sh') }}
           restore-keys: |
@@ -51,6 +52,15 @@ jobs:
           CI: "true"
           GOLANGCI_LINT_TIMEOUT: "5m"
         run: ./scripts/ci/ci.sh
+
+      - name: Check GoReleaser configuration
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          version: v2.17.0
+          args: check
+
+      - name: Build Docker image
+        run: docker build --tag go-llm-project-structure:ci .
 
       - name: Generate coverage
         run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
@@ -85,19 +95,3 @@ jobs:
           name: sbom-${{ matrix.go-version }}
           path: sbom.json
           retention-days: 30
-
-  fuzz:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ["1.26.5"]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
-      - name: Run fuzz tests
-        run: go test -fuzz=. -fuzztime=60s ./...

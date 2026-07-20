@@ -21,6 +21,7 @@ for file in $domain_files; do
     struct_defs=$(grep -n "^type [A-Z].* struct" "$file" || true)
 
     while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
         line_num=$(echo "$line" | cut -d: -f1)
         struct_line=$(echo "$line" | cut -d: -f2-)
         struct_name=$(echo "$struct_line" | awk '{print $2}')
@@ -57,6 +58,7 @@ for dir in internal/core/services internal/core/ports; do
         struct_defs=$(grep -n "^type [A-Z].* struct" "$file" || true)
 
         while IFS= read -r line; do
+            [[ -n "$line" ]] || continue
             line_num=$(echo "$line" | cut -d: -f1)
             struct_body=$(sed -n "${line_num},/^}/p" "$file" || true)
 

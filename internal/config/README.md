@@ -1,10 +1,11 @@
 # Config Layer
 
-Centralized configuration structures and loading logic.
+Dependency-free configuration structures, defaults, and standard-library validation.
 
 ## Best Practices
 
 - Define configuration as structs with validation
-- Support multiple sources (env vars, YAML, flags, etc.)
 - Keep configuration simple and immutable where possible
-- Used primarily by primary adapters (e.g. `main.go`)
+- Use only the Go standard library in this package
+- Put vendor-specific or format-specific loading behind an adapter boundary
+- Construct configuration in `cmd/` and pass it to primary adapters

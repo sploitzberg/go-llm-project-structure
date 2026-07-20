@@ -15,10 +15,12 @@ Imagine your application is like a restaurant:
 - **Secondary Adapters** = Suppliers (grocery stores, delivery services)
 - **Service** = The chef (coordinates everything and makes the food)
 
+The following diagram shows **runtime control flow**. The dependency rules are shown separately later in this guide.
+
 ```mermaid
 graph TB
     subgraph "Outside World"
-        User[User]
+        Actor[User]
         Database[(Database)]
         API[External API]
     end
@@ -40,7 +42,7 @@ graph TB
     end
 
     subgraph "Domain Layer"
-        User[User Entity]
+        UserEntity[User Entity]
         Order[Order Entity]
     end
 
@@ -56,7 +58,7 @@ graph TB
         SMTP[SMTP Adapter]
     end
 
-    User --> HTTP
+    Actor --> HTTP
     HTTP --> UserService
     GRPC --> UserService
     CLI --> UserService
@@ -64,9 +66,9 @@ graph TB
     UserService --> UserSvc
     OrderService --> OrderSvc
 
-    UserSvc --> User
+    UserSvc --> UserEntity
     OrderSvc --> Order
-    OrderSvc --> User
+    OrderSvc --> UserEntity
 
     UserSvc --> UserRepo
     OrderSvc --> OrderRepo
@@ -211,7 +213,9 @@ func (s *UserServiceImpl) Register(ctx context.Context, cmd RegisterUserCommand)
     }
 
     // 4. Send welcome email (secondary port)
-    s.emailSender.SendWelcomeEmail(ctx, user.Email)
+    if err := s.emailSender.SendWelcomeEmail(ctx, user.Email); err != nil {
+        return User{}, err
+    }
 
     return user, nil
 }
@@ -346,59 +350,31 @@ sequenceDiagram
 
 ### Dependency Direction
 
-```
-┌─────────────────────────────────────────┐
-│         Outside World                   │
-│  (Users, APIs, Databases, etc.)        │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Primary Adapters                 │
-│  (HTTP, gRPC, CLI)                      │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Primary Ports                    │
-│  (Interfaces for use cases)             │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Service Layer                    │
-│  (Application logic)                    │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Domain Layer                     │
-│  (Business entities & rules)            │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Secondary Ports                  │
-│  (Interfaces for external deps)         │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Secondary Adapters               │
-│  (PostgreSQL, MongoDB, SMTP)            │
-└─────────────────────────────────────────┘
-                  ↓
-┌─────────────────────────────────────────┐
-│         Outside World                   │
-│  (Databases, APIs, etc.)               │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    PrimaryAdapter[Primary Adapter] --> PrimaryPort[Primary Port]
+    PrimaryAdapter --> Domain
+    PrimaryPort --> Domain
+    Service --> PrimaryPort
+    Service --> SecondaryPort[Secondary Port]
+    Service --> Domain
+    SecondaryPort --> Domain
+    SecondaryAdapter[Secondary Adapter] --> SecondaryPort
+    SecondaryAdapter --> Domain
 ```
 
-**The arrows show the flow of control: requests come from outside, flow inward through the layers, and the domain is at the center. Dependencies point inward toward the domain.**
+**These arrows are compile-time dependencies (Go imports), not runtime call order.** Runtime control enters through a primary adapter, is dispatched through a primary port to a service, and leaves through a secondary port implemented by a secondary adapter. The service imports port contracts; the ports never import the service or adapters.
 
 ### What Each Layer Can Depend On
 
-| Layer       | Can Depend On | Cannot Depend On         |
-| ----------- | ------------- | ------------------------ |
-| **Domain**  | Nothing       | Anything else            |
-| **Port**    | Domain        | Adapter, Service         |
-| **Service** | Domain, Port  | Adapter                  |
-| **Adapter** | Port, Domain  | Other adapters (usually) |
-| **Config**  | Nothing       | -                        |
+| Layer | Allowed project dependencies | External dependencies |
+| --- | --- | --- |
+| **Domain** | None | Standard library only |
+| **Primary/secondary port** | Domain | Standard library only |
+| **Service** | Domain, primary ports, secondary ports | Standard library only |
+| **Primary adapter** | Domain, primary ports, config | Allowed |
+| **Secondary adapter** | Domain, secondary ports | Allowed |
+| **Config** | None | Standard library only |
 
 ### Why This Matters
 

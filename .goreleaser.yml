@@ -7,7 +7,7 @@ project_name: go-llm-project-structure
 
 before:
   hooks:
-    - go mod tidy
+    - go mod tidy -diff
     - go mod download
 
 builds:
@@ -21,7 +21,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w
     main: ./cmd/go-llm-project-structure
 
 archives:

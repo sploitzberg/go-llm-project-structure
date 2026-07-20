@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Git pre-commit hook wrapper
-# Runs all pre-commit validation scripts
+# Validate the exact staged repository snapshot, not unstaged working-tree content.
 
 set -euo pipefail
 
-# Find project root (go up from .githooks directory)
-HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HOOK_DIR/.." && pwd)"
-cd "$ROOT"
+SNAPSHOT="$(mktemp -d)"
+trap 'rm -rf "$SNAPSHOT"' EXIT INT TERM
 
-# Run pre-commit scripts
+# checkout-index exports only the index, so partially staged files are checked as
+# they will be committed. The trailing slash is required by --prefix.
+git -C "$ROOT" checkout-index --all --prefix="$SNAPSHOT/"
+cd "$SNAPSHOT"
+
 ./scripts/ci/pre-commit/02-golangci-lint.sh
 ./scripts/ci/pre-commit/03-tests.sh
 ./scripts/ci/pre-commit/04-hex-arch-guardrail.sh

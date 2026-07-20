@@ -40,8 +40,23 @@ The goal is to create a clean, maintainable, and technology-independent core tha
 
 ### `config/`
 
-- Centralizes configuration structures and loading logic.
-- Used primarily by primary adapters.
+- Contains dependency-free configuration structures and standard-library parsing or validation.
+- May be consumed by primary adapters and the composition root.
+- Vendor-specific configuration loaders belong at an adapter boundary.
+
+## Enforced Dependency Matrix
+
+| Source layer | Allowed project imports | External imports |
+| --- | --- | --- |
+| `core/domain/` | None | Standard library only |
+| `core/ports/` | `core/domain/` | Standard library only |
+| `core/services/` | `core/domain/`, `core/ports/` | Standard library only |
+| `adapter/primary/` | `core/domain/`, `core/ports/primary/`, `config/` | Allowed |
+| `adapter/secondary/` | `core/domain/`, `core/ports/secondary/` | Allowed |
+| `config/` | None | Standard library only |
+| `cmd/` | Any layer needed for composition | Allowed |
+
+Core production code may use the standard library except infrastructure-facing packages such as `database/sql`, `net/http`, `net/rpc`, and `net/smtp`; those belong in adapters. Tests may use external test libraries, but forbidden project-layer edges remain forbidden. Go files under a new `internal/` package fail the architecture guardrail until the matrix and validator explicitly define that layer. Each secondary-adapter package must also declare a compile-time assertion that it implements a secondary port.
 
 ## Dependency Graph
 
@@ -68,7 +83,9 @@ flowchart TB
 
     PAdapter --> Port
     PAdapter --> Domain
+    PAdapter --> Config
     SAdapter --> Port
+    SAdapter --> Domain
 
     classDef core fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,rx:10,ry:10
     classDef adapter fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,rx:10,ry:10

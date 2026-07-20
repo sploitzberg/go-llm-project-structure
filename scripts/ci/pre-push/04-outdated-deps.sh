@@ -11,8 +11,8 @@ fi
 
 echo "> Checking for outdated dependencies"
 
-# Check for outdated direct dependencies only (not transitive)
-outdated=$(go list -u -m 2>/dev/null | grep -v "^\[" | awk '{if ($2 != $3) print $0}')
+# Check direct dependencies only (not transitive). Keep package-load failures fatal.
+outdated=$(go list -u -m -f '{{if and (not .Main) (not .Indirect) .Update}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}' all)
 
 if [ -n "$outdated" ]; then
     echo "error: Outdated dependencies found:"

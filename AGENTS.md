@@ -136,7 +136,7 @@ This project separates unit and integration tests to maintain fast CI feedback.
 - Use `t.Run` for subtests with descriptive names
 - Test file naming: `mycode_test.go` in same package as `mycode.go`
 - Exported test functions must start with `Test`
-- Maintain test coverage above 80% (configurable via `COVERAGE_THRESHOLD`)
+- Maintain combined `cmd/...` and `internal/...` coverage above 80% (configurable via `COVERAGE_THRESHOLD`)
 
 ### Running Tests
 
@@ -147,7 +147,6 @@ task integration             # Integration tests
 go test -race -tags=integration ./...
 go test -coverprofile=coverage.out ./...  # With coverage
 task benchmark              # Benchmark tests for performance-critical code
-task fuzz                   # Fuzz tests for security-critical code (Go 1.18+)
 ```
 
 </testing>
@@ -172,7 +171,7 @@ This project uses centralized scripts for all quality checks, ensuring consisten
 ### Running CI Locally
 
 ```bash
-# Run full CI pipeline (same as GitHub Actions)
+# Run the core CI pipeline used by GitHub Actions
 task ci
 # or
 ./scripts/ci/ci.sh
@@ -182,7 +181,7 @@ task ci
 
 Git hooks run automatically on commits/push. All hook logic lives in `scripts/ci/` with thin wrappers in `.githooks/`:
 
-- **pre-commit**: gofmt, goimports, golangci-lint, tests, hex-arch-guardrail, gosec, go-vet, secrets, license headers, file quality, complexity (changed files)
+- **pre-commit**: validates the exact staged snapshot with golangci-lint static checks, tests, architecture guardrails, secrets, file quality, adapter contracts, and source conventions
 - **pre-push**: build, tests, hex-arch-guardrail, coverage, outdated dependencies, complexity (full analysis)
 - **commit-msg**: conventional commits format, message length
 - **pre-rebase**: protect main/master branches
@@ -194,7 +193,7 @@ Environment variables control behavior:
 
 - `COVERAGE_THRESHOLD` — Default 80%
 - `GOLANGCI_LINT_TIMEOUT` — Default 2m (pre-commit), 5m (CI)
-- `GO_TEST_FLAGS` — Default `-short` (pre-commit), `-race` (CI)
+- `GO_TEST_FLAGS` — Default `-race -count=1`
   </ci_checks>
 
 ---
@@ -209,24 +208,15 @@ This project enforces code complexity limits to maintain maintainability and tes
 - **Cyclomatic Complexity** (gocyclo) - McCabe complexity metric, measures decision points
 - **Cognitive Complexity** (gocognit) - Measures nesting, control flow jumps, and mental effort
 
-### Layer-Specific Thresholds
+### Global Thresholds
 
-Complexity expectations differ by hexagonal architecture layer:
+Complexity is enforced consistently across production and tooling code. `gocyclo` reports functions at complexity 15 or higher, `gocognit` reports functions at complexity 10 or higher, and `funlen` limits functions to 60 lines or 40 statements.
 
-| Layer                | Cyclomatic Max | Cognitive Max | Rationale                                       |
-| -------------------- | -------------- | ------------- | ----------------------------------------------- |
-| `core/domain/`       | 5              | 10            | Pure business logic, must be simple and focused |
-| `core/ports/`        | 3              | 5             | Interface definitions, minimal logic            |
-| `core/services/`     | 10             | 15            | Orchestration allowed, but keep manageable      |
-| `adapter/primary/`   | 15             | 20            | HTTP handlers, CLI — external concerns          |
-| `adapter/secondary/` | 12             | 18            | Database, API clients — external integrations   |
+Hexagonal layers still have different design expectations—domain and port code should normally remain well below the global limits—but the executable lint configuration does not claim unsupported per-directory thresholds.
 
 ### Configuration
 
-Complexity thresholds are configurable via `.golangci.yml`:
-
-- Enable/disable checks globally
-- Adjust thresholds per layer via `gocyclo` and `gocognit` linter settings
+Global complexity thresholds are configured in `.golangci.yml` through `gocyclo`, `gocognit`, and `funlen`.
 
 ### Guidance for AI Agents
 

@@ -12,4 +12,10 @@ These are the infrastructure components the application uses.
 - File system access
 - Email / notification senders
 
-They implement the interfaces defined in `core/ports/secondary`.
+They implement the interfaces defined in `core/ports/secondary`. Every secondary-adapter package must include an explicit compile-time assertion, for example:
+
+```go
+var _ secondaryport.UserRepository = (*PostgresUserRepository)(nil)
+```
+
+The architecture guardrail requires the assertion, and Go compilation verifies that the implementation satisfies the port.

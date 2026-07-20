@@ -46,10 +46,8 @@ THRESHOLD_SERVICES=$(threshold_for_layer "core_services" "10")
 THRESHOLD_PRIMARY=$(threshold_for_layer "adapter_primary" "20")
 THRESHOLD_SECONDARY=$(threshold_for_layer "adapter_secondary" "15")
 
-MODULE=$(go list -m)
-
-# Check fan-out for a given package path and threshold
-# Fan-out = number of external (non-stdlib, non-self) imports
+# Check fan-out for a given package path and threshold.
+# Fan-out = number of unique non-standard-library imports, including project packages.
 check_fanout() {
     local layer_name="$1"
     local pkg_path="$2"
@@ -65,11 +63,10 @@ check_fanout() {
         return 0
     fi
 
-    # List all imports of this layer, subtract stdlib and self-module packages
+    # List all direct imports of this layer and subtract only standard-library packages.
     local fanout
     fanout=$(goda list "./${pkg_path}/...:import" 2>/dev/null \
         | grep -v "^ID$" \
-        | grep -v "^${MODULE}" \
         | grep -v "^std " \
         | grep -v "^$" \
         | wc -l | tr -d ' ' || true)

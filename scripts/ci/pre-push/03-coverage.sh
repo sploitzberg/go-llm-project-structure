@@ -9,43 +9,32 @@ if ! command -v go >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! command -v bc >/dev/null 2>&1; then
-    echo "error: bc not found. Install with your package manager"
-    exit 1
-fi
-
 echo "> Running test coverage check"
 
 COVERAGE_THRESHOLD=${COVERAGE_THRESHOLD:-80}
+coverage_file=$(mktemp)
+trap 'rm -f "$coverage_file"' EXIT INT TERM
 
-# Run tests with coverage (show output for debugging)
-if ! go test -coverprofile=coverage.out -covermode=atomic ./...; then
+# Measure shipped application packages. CI/setup tools have focused regression suites.
+if ! go test -coverprofile="$coverage_file" -covermode=atomic ./cmd/... ./internal/...; then
     echo "error: Tests failed during coverage check"
-    rm -f coverage.out
     exit 1
 fi
 
-# Get total coverage
-coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+# Get total coverage.
+coverage=$(go tool cover -func="$coverage_file" | awk '/^total:/ {gsub(/%/, "", $3); print $3}')
 
 if [ -z "$coverage" ]; then
     echo "error: Could not determine coverage"
-    rm -f coverage.out
     exit 1
 fi
 
 echo "Current coverage: ${coverage}%"
 echo "Required coverage: ${COVERAGE_THRESHOLD}%"
 
-# Compare with threshold (using bc for floating point comparison)
-result=$(echo "$coverage >= $COVERAGE_THRESHOLD" | bc -l 2>/dev/null || echo "0")
-if [ "$result" = "0" ]; then
+if ! awk -v coverage="$coverage" -v threshold="$COVERAGE_THRESHOLD" 'BEGIN { exit !(coverage >= threshold) }'; then
     echo "error: Coverage below threshold. Current: ${coverage}%, Required: ${COVERAGE_THRESHOLD}%"
-    rm -f coverage.out
     exit 1
 fi
 
 echo "Coverage: OK (${coverage}%)"
-
-# Clean up
-rm -f coverage.out

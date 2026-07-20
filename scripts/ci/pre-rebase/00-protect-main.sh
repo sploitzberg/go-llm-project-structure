@@ -4,7 +4,11 @@
 
 set -euo pipefail
 
-branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+branch="${2-}"
+if [[ -z "$branch" ]]; then
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+fi
+branch="${branch#refs/heads/}"
 
 if [[ "$branch" == "main" ]] || [[ "$branch" == "master" ]]; then
     echo "error: Rebasing the $branch branch is not allowed."

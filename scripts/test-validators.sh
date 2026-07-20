@@ -1,130 +1,127 @@
 #!/usr/bin/env bash
-# scripts/test-validators.sh
-# Fuzz test validation scripts with actual Go files
+# Run regression tests for repository validation scripts.
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
-
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> Testing validation scripts with actual Go files"
-echo
+failures=0
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT INT TERM
 
-# Test 1: Domain with adapter import (should fail hex-arch-guardrail)
-echo "Test 1: Domain with forbidden adapter import"
-if [ ! -d "internal/core/domain" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No internal/core/domain directory"
-else
-    TEST_FILE="internal/core/domain/test_violation.go"
-    cat > "$TEST_FILE" <<'EOF'
-package domain
-
-import "github.com/sploitzberg/go-llm-project-structure/internal/adapter"
-
-type TestEntity struct{}
-EOF
-
-    # Run hex-arch-guardrail and check if it catches the violation
-    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "core/domain/ must not import"; then
-        echo -e "${GREEN}PASS${NC}: Domain with forbidden adapter import detected"
-    else
-        echo -e "${RED}FAIL${NC}: Domain with forbidden adapter import not detected"
-    fi
-    rm -f "$TEST_FILE"
-fi
-
-# Test 2: Service with adapter import (should fail hex-arch-guardrail)
-echo "Test 2: Service with forbidden adapter import"
-if [ ! -d "internal/core/services" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No internal/core/services directory"
-else
-    TEST_FILE="internal/core/services/test_violation.go"
-    cat > "$TEST_FILE" <<'EOF'
-package service
-
-import "github.com/sploitzberg/go-llm-project-structure/internal/adapter"
-
-type TestService struct{}
-EOF
-
-    if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "core/services/ must not depend on adapter"; then
-        echo -e "${GREEN}PASS${NC}: Service with forbidden adapter import detected"
-    else
-        echo -e "${RED}FAIL${NC}: Service with forbidden adapter import not detected"
-    fi
-    rm -f "$TEST_FILE"
-fi
-
-# Test 3: File with trailing whitespace (should fail file-quality)
-echo "Test 3: File with trailing whitespace"
-TEST_FILE="test_trailing.go"
-cat > "$TEST_FILE" <<'EOF'
-package test
-
-func bad() {
-    // trailing space
+pass() {
+    echo "PASS: $*"
 }
-EOF
 
-if ./scripts/ci/pre-commit/12-file-quality.sh 2>&1 | grep -q "trailing whitespace"; then
-    echo -e "${GREEN}PASS${NC}: Trailing whitespace detected"
+fail() {
+    echo "FAIL: $*" >&2
+    failures=$((failures + 1))
+}
+
+expect_failure_containing() {
+    local description="$1"
+    local expected="$2"
+    shift 2
+
+    local output
+    local status
+    set +e
+    output=$("$@" 2>&1)
+    status=$?
+    set -e
+
+    if [[ $status -ne 0 && "$output" == *"$expected"* ]]; then
+        pass "$description"
+    else
+        fail "$description (status=$status, expected output containing: $expected)"
+        printf '%s\n' "$output" >&2
+    fi
+}
+
+echo "==> Testing architecture validator"
+if go test ./scripts/ci/hexarch; then
+    pass "architecture dependency matrix"
 else
-    echo -e "${RED}FAIL${NC}: Trailing whitespace not detected"
+    fail "architecture dependency matrix"
 fi
-rm -f "$TEST_FILE"
 
-# Test 4: File with merge conflict markers (should fail file-quality)
-echo "Test 4: File with merge conflict markers"
-TEST_FILE="test_merge.go"
-cat > "$TEST_FILE" <<'EOF'
-package test
+echo
+echo "==> Testing file-quality validator"
+mkdir -p "$tmpdir/scripts/ci/pre-commit"
+cp scripts/ci/pre-commit/12-file-quality.sh "$tmpdir/scripts/ci/pre-commit/12-file-quality.sh"
+chmod +x "$tmpdir/scripts/ci/pre-commit/12-file-quality.sh"
+
+printf 'package fixture\n\nvar value = 1 \n' > "$tmpdir/trailing.go"
+expect_failure_containing \
+    "trailing whitespace is rejected" \
+    "trailing whitespace" \
+    "$tmpdir/scripts/ci/pre-commit/12-file-quality.sh"
+rm "$tmpdir/trailing.go"
+
+cat > "$tmpdir/conflict.go" <<'EOF'
+package fixture
 
 <<<<<<< HEAD
-func old() {}
+var value = 1
 =======
-func new() {}
+var value = 2
 >>>>>>> branch
 EOF
+expect_failure_containing \
+    "merge conflict markers are rejected" \
+    "merge conflict markers" \
+    "$tmpdir/scripts/ci/pre-commit/12-file-quality.sh"
+rm "$tmpdir/conflict.go"
 
-if ./scripts/ci/pre-commit/12-file-quality.sh 2>&1 | grep -q "merge conflict"; then
-    echo -e "${GREEN}PASS${NC}: Merge conflict markers detected"
+printf 'package fixture\n\nvar value = 1\n' > "$tmpdir/valid.go"
+if output=$("$tmpdir/scripts/ci/pre-commit/12-file-quality.sh" 2>&1) && [[ "$output" == *"File quality: OK"* ]]; then
+    pass "valid files are accepted"
 else
-    echo -e "${RED}FAIL${NC}: Merge conflict markers not detected"
-fi
-rm -f "$TEST_FILE"
-
-# Test 5: Valid file (should pass file-quality)
-echo "Test 5: Valid Go file"
-TEST_FILE="test_valid.go"
-cat > "$TEST_FILE" <<'EOF'
-package test
-
-func valid() string {
-    return "ok"
-}
-EOF
-
-if ./scripts/ci/pre-commit/12-file-quality.sh 2>&1 | grep -q "OK"; then
-    echo -e "${GREEN}PASS${NC}: Valid file passes checks"
-else
-    echo -e "${RED}FAIL${NC}: Valid file failed checks"
-fi
-rm -f "$TEST_FILE"
-
-# Test 6: Valid hex-arch (should pass)
-echo "Test 6: Valid hex-arch structure"
-if ./scripts/ci/hex-arch-guardrail.sh 2>&1 | grep -q "PASSED"; then
-    echo -e "${GREEN}PASS${NC}: Valid hex-arch structure passes"
-else
-    echo -e "${RED}FAIL${NC}: Valid hex-arch structure failed"
+    fail "valid files are accepted"
+    printf '%s\n' "${output:-}" >&2
 fi
 
 echo
-echo "==> Test summary"
-echo "Hex-arch-guardrail now uses go list for accurate import detection."
-echo "File-quality checks use grep-based pattern matching."
+echo "==> Testing staged-snapshot pre-commit hook"
+hook_fixture="$tmpdir/hook-fixture"
+mkdir -p "$hook_fixture/.githooks" "$hook_fixture/scripts/ci/pre-commit"
+cp .githooks/pre-commit "$hook_fixture/.githooks/pre-commit"
+
+cat > "$hook_fixture/validator.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+grep -qx "$EXPECTED_CONTENT" state.txt
+EOF
+chmod +x "$hook_fixture/validator.sh"
+
+for script in \
+    02-golangci-lint.sh \
+    03-tests.sh \
+    04-hex-arch-guardrail.sh \
+    07-secrets.sh \
+    12-file-quality.sh \
+    13-interface-impl.sh \
+    14-exported-symbols.sh \
+    17-struct-fields.sh; do
+    cp "$hook_fixture/validator.sh" "$hook_fixture/scripts/ci/pre-commit/$script"
+done
+
+printf 'staged\n' > "$hook_fixture/state.txt"
+git -C "$hook_fixture" init --quiet
+git -C "$hook_fixture" add .
+printf 'working tree\n' > "$hook_fixture/state.txt"
+
+if EXPECTED_CONTENT=staged bash "$hook_fixture/.githooks/pre-commit" && grep -qx 'working tree' "$hook_fixture/state.txt"; then
+    pass "pre-commit validates the index without modifying the working tree"
+else
+    fail "pre-commit did not validate the staged snapshot"
+fi
+
+echo
+if ((failures > 0)); then
+    echo "error: validator regression tests failed with $failures failure(s)" >&2
+    exit 1
+fi
+
+echo "success: all validator regression tests passed"

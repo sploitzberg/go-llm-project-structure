@@ -10,4 +10,4 @@ ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 cd "$ROOT"
 
 # Run pre-rebase scripts
-./scripts/ci/pre-rebase/00-protect-main.sh
+./scripts/ci/pre-rebase/00-protect-main.sh "$@"

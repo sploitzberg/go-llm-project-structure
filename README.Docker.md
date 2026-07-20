@@ -1,22 +1,30 @@
-### Building and running your application
+# Docker
 
-When you're ready, start your application by running:
-`docker compose up --build`.
+The bootstrap image runs the removable greeting CLI example. It does not expose a network port.
 
-Your application will be available at http://localhost:8080.
+## Build and run
 
-### Deploying your application to the cloud
+```bash
+docker build -t go-llm-project-structure .
+docker run --rm go-llm-project-structure Go Developer
+```
 
-First, build your image, e.g.: `docker build -t myapp .`.
-If your cloud uses a different CPU architecture than your development
-machine (e.g., you are on a Mac M1 and your cloud provider is amd64),
-you'll want to build the image for that platform, e.g.:
-`docker build --platform=linux/amd64 -t myapp .`.
+Expected output:
 
-Then, push it to your registry, e.g. `docker push myregistry.com/myapp`.
+```text
+Hello, Go Developer!
+```
 
-Consult Docker's [getting started](https://docs.docker.com/go/get-started-sharing/)
-docs for more detail on building and pushing.
+The Compose example supplies `Docker` as the name:
 
-### References
-* [Docker's Go guide](https://docs.docker.com/language/golang/)
+```bash
+docker compose up --build
+```
+
+To pass different arguments through Compose:
+
+```bash
+docker compose run --rm app Go Developer
+```
+
+When replacing the greeting CLI with an HTTP or gRPC adapter, update the Docker `ENTRYPOINT`, Compose service, and exposed ports together.

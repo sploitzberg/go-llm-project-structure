@@ -15,6 +15,6 @@ cd "$ROOT"
 ./scripts/ci/pre-push/02-hex-arch-guardrail.sh
 ./scripts/ci/pre-push/03-coverage.sh
 ./scripts/ci/pre-push/04-outdated-deps.sh
-# Note: Complexity analysis is handled by golangci-lint (gocyclo, gocognit, funlen)
+GOLANGCI_LINT_TIMEOUT="${GOLANGCI_LINT_TIMEOUT:-5m}" ./scripts/ci/pre-commit/02-golangci-lint.sh
 ./scripts/ci/pre-push/06-gremlins.sh
 ./scripts/ci/pre-push/07-coupling.sh

@@ -9,22 +9,22 @@ vars:
     sh: go env GOOS
   GOARCH:
     sh: go env GOARCH
-  BINDIR: "bin/{{.GOOS}}-{{.GOARCH}}"
-  EXE: '{{if eq .GOOS "windows"}}.exe{{end}}'
-  VERSION:
-    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
 
 tasks:
   default:
-    desc: Run full CI pipeline (same as GitHub Actions)
+    desc: Run the core CI pipeline used by GitHub Actions
     cmds:
       - task: ci
 
   build:
     desc: Build the CLI binary for host OS
+    vars:
+      BINDIR: "bin/{{.GOOS}}-{{.GOARCH}}"
+      EXE: '{{if eq .GOOS "windows"}}.exe{{end}}'
     cmds:
       - mkdir -p {{.BINDIR}}
-      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w -X main.version={{.VERSION}}" -o {{.BINDIR}}/{{.BINARY_NAME}}{{.EXE}} ./cmd/go-llm-project-structure
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -ldflags="-s -w" -o {{.BINDIR}}/{{.BINARY_NAME}}{{.EXE}} ./cmd/go-llm-project-structure
       - echo "  → {{.BINDIR}}/{{.BINARY_NAME}}{{.EXE}}"
 
   build-linux:
@@ -97,20 +97,17 @@ tasks:
     cmds:
       - sh -c "syft . -o spdx-json > sbom.json"
 
-  pprof:
-    desc: Run with pprof profiling enabled
-    cmds:
-      - ENABLE_PPROF=true go run ./cmd/go-llm-project-structure
-
-  fuzz:
-    desc: Run fuzz tests (Go 1.18+)
-    cmds:
-      - go test -fuzz=. -fuzztime=30s ./...
-
   lint:
     desc: Run golangci-lint
     cmds:
       - golangci-lint run --timeout=5m
+
+  workflow-lint:
+    desc: Validate GitHub Actions workflows
+    cmds:
+      - actionlint
+
+
 
   fmt:
     desc: Format code (now handled by golangci-lint formatters)
@@ -118,18 +115,19 @@ tasks:
       - golangci-lint run --fix
 
   ci:
-    desc: "Full pipeline (same as GitHub Actions: ./scripts/ci/ci.sh)"
+    desc: Run the core CI pipeline used by GitHub Actions
     cmds:
       - ./scripts/ci/ci.sh
 
-
+  test-guardrails:
+    desc: Run regression tests for architecture and file-quality validators
+    cmds:
+      - ./scripts/test-validators.sh
 
   rename:
     desc: "Rename repository: task rename -- github.com/<owner>/<repo>"
     cmds:
       - ./scripts/setup/rename-repo.sh {{.CLI_ARGS}}
-
-
 
   install:
     desc: Install the CLI locally
@@ -137,9 +135,9 @@ tasks:
       - go install ./cmd/go-llm-project-structure
 
   run:
-    desc: Run the CLI via go run
+    desc: Run the removable greeting CLI example
     cmds:
-      - go run ./cmd/go-llm-project-structure
+      - go run ./cmd/go-llm-project-structure {{.CLI_ARGS}}
 
   clean:
     desc: Remove build artifacts

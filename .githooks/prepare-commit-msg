@@ -10,4 +10,4 @@ ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 cd "$ROOT"
 
 # Run prepare-commit-msg scripts
-./scripts/ci/prepare-commit-msg/00-add-branch-name.sh "$1"
+./scripts/ci/prepare-commit-msg/00-add-branch-name.sh "$@"

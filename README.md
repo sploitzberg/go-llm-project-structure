@@ -4,6 +4,18 @@
 
 A Go project template implementing strict **Hexagonal Architecture** (Ports & Adapters pattern) with first-class Zed IDE configuration.
 
+## Prerequisites
+
+- Git
+- Go 1.26.5 or a compatible toolchain capable of honoring the `go.mod` toolchain requirement
+- [Task](https://taskfile.dev/installation/)
+
+Install Task with Go if it is not already available:
+
+```bash
+go install github.com/go-task/task/v3/cmd/task@v3.52.0
+```
+
 ## Quick Start
 
 ```bash
@@ -11,8 +23,12 @@ A Go project template implementing strict **Hexagonal Architecture** (Ports & Ad
 git clone https://github.com/sploitzberg/go-llm-project-structure.git
 cd go-llm-project-structure
 
-# Install dependencies
+# Rename the clean clone before making other tracked changes
+./scripts/setup/rename-repo.sh github.com/acme/my-service
+
+# Install dependencies and pinned development tools
 go mod download
+task tools
 
 # Enable the version-controlled Git hooks
 git config core.hooksPath .githooks
@@ -20,12 +36,26 @@ git config core.hooksPath .githooks
 # Open the project in Zed
 zed .
 
-# Run the application or tests from Zed's task picker, or from the terminal
-task run
+# Run the removable example or tests from Zed's task picker, or from the terminal
+task run -- Go Developer
 task test
 ```
 
 Zed automatically loads the project tasks and Go settings from `.zed/`. Git hooks and CI enforce the same production-grade Go and Hexagonal Architecture guardrails outside the editor.
+
+### Repository Rename
+
+Run `scripts/setup/rename-repo.sh` once on a clean clone. It accepts `github.com/<owner>/<repo>` or an HTTPS GitHub clone URL, updates tracked text references using fixed-string replacement, renames the matching `cmd/` directory, runs `go mod tidy`, and rolls back if validation fails.
+
+```bash
+# Interactive confirmation
+./scripts/setup/rename-repo.sh https://github.com/acme/my-service.git
+
+# Non-interactive automation
+./scripts/setup/rename-repo.sh --yes github.com/acme/my-service
+```
+
+Untracked and ignored files are never rewritten. Tracked changes must be committed or stashed first so rollback remains reliable.
 
 ## Guardrails & CI/CD
 
@@ -33,11 +63,16 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 
 ### Architecture Guardrails
 
-- **Hexagonal Architecture Guardrail** - Enforces dependency rules (domain purity, correct layer dependencies)
-- **Import Cycle Detection** - Prevents circular dependencies
-- **Framework Leak Detection** - Ensures core packages don't depend on frameworks
+- **Hexagonal Architecture Guardrail** - Parses every Go file, including inactive build-tag and platform files, and enforces the documented dependency matrix
+- **Import Cycle Detection** - Uses package loading for active code and an all-file project import graph for inactive code
+- **Core Purity** - Allows only non-infrastructure standard-library imports in domain, ports, services, and config
+- **Adapter Contracts** - Requires explicit compile-time secondary-port implementation assertions
+
+CI intentionally uses a small hybrid toolchain: shell scripts orchestrate installed commands and Git hooks, while Go is used for semantic work that needs the Go parser, graph analysis, or transactional filesystem behavior. Converting every shell wrapper to Go would increase bootstrap complexity without improving those simple orchestration steps.
 
 ### Code Quality Checks
+
+The coverage threshold applies to shipped packages under `cmd/` and `internal/`; CI and setup tools run separate regression suites.
 
 - **Formatting** - gopls formatting on save in Zed, with gofmt and goimports enforced by CI
 - **Linting** - golangci-lint with comprehensive rule set
@@ -45,10 +80,7 @@ This template includes a comprehensive CI/CD pipeline with automated quality che
 - **Error Wrapping** - Validates proper error handling with `%w`
 - **Struct Fields** - Ensures exported struct fields have proper tags
 - **Import Order** - Enforces consistent import ordering
-- **Complexity Analysis** - Enforces cyclomatic and cognitive complexity limits with layer-specific thresholds
-  - **Cyclomatic** (gocyclo) - McCabe complexity metric
-  - **Cognitive** (gocognit) - Measures nesting and control flow jumps
-  - **Configurable** via golangci-lint configuration with architecture-aware thresholds
+- **Complexity Analysis** - Enforces global cyclomatic, cognitive, and function-length limits through `gocyclo`, `gocognit`, and `funlen`; domain and port code is expected to remain comfortably below those global limits
 
 ### Mutation Testing
 
@@ -89,16 +121,18 @@ docker exec -it <container-name> bash
 - gopls 0.23.0 and Delve 1.27.0
 - Gremlins 0.6.0
 - goda 0.9.4
+- actionlint 1.7.7
 - Pre-configured git hooks
 
 ### Docker (Optional)
 
-This project includes optional Docker support for deployment:
+This project includes optional Docker support for the removable CLI example. It does not expose a network service.
 
 **Build and run with Docker:**
 
 ```bash
-docker compose up --build
+docker build -t go-llm-project-structure .
+docker run --rm go-llm-project-structure Go Developer
 ```
 
 **Build image only:**
@@ -135,9 +169,11 @@ Note: Docker is optional for development. Use the dev container or local Go tool
 
 ### Git Hooks
 
-- **pre-commit** - Fast checks (formatting, linting, unit tests, complexity on changed files)
-- **pre-push** - Comprehensive checks (build, all tests, coverage, complexity full analysis, outdated dependencies)
+- **pre-commit** - Validates the exact staged repository snapshot with linting, unit tests, architecture, secrets, and source-quality checks
+- **pre-push** - Comprehensive checks (build, all tests, coverage, full lint/complexity analysis, outdated dependencies, mutation dry-run, and coupling)
 - **commit-msg** - Conventional commits format validation
+
+The pre-commit hook exports the Git index to a temporary directory and validates that snapshot. Unstaged fixes cannot hide a staged violation, and unrelated unstaged work does not cause false failures.
 
 ## Architecture
 
@@ -148,6 +184,20 @@ This project follows Hexagonal Architecture with these layers:
 - `internal/core/services/` — Application use case orchestration
 - `internal/adapter/` — Concrete implementations (HTTP, database, etc.)
 - `internal/config/` — Configuration structures
+
+### Removable Greeting Example
+
+The repository includes one deliberately small vertical slice so a fresh clone compiles and demonstrates the dependency flow:
+
+- `internal/core/domain/greeting/`
+- `internal/core/ports/primary/greeting/`
+- `internal/core/ports/secondary/greeting/`
+- `internal/core/services/greeting/`
+- `internal/adapter/primary/greetingcli/`
+- `internal/adapter/secondary/greetingmemory/`
+- `cmd/go-llm-project-structure/`
+
+It has no external dependencies and is not intended as application functionality. To remove it, delete the six `greeting*` feature directories and replace the composition root under `cmd/` with your application entry point.
 
 ## Zed IDE Integration
 
@@ -183,16 +233,16 @@ The Zed tasks call the same Taskfile and CI scripts used by local Git hooks and 
 - `task test-all` — Run both unit and integration tests
 - `task integration` — Run integration tests (slower, external dependencies)
 - `task lint` — Run golangci-lint
+- `task workflow-lint` — Validate GitHub Actions workflows with actionlint
 - `task fmt` — Format code
-- `task ci` — Run full CI checks
+- `task ci` — Run the core CI checks used by GitHub Actions
+- `task test-guardrails` — Run architecture and file-quality validator regression tests
 - `task install` — Install locally
 - `task tools` — Install pinned local/CI quality tools
 - `task mutation-test` — Full mutation testing with Gremlins (slow, thorough)
 - `task mutation-test-dry` — Fast mutation dry-run (CI mode)
 - `task benchmark` — Run benchmark tests
 - `task sbom` — Generate Software Bill of Materials (SBOM)
-- `task pprof` — Run application with pprof profiling enabled
-- `task fuzz` — Run fuzz tests for security-critical code
 
 ## Integration Tests
 
